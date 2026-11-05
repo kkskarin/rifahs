@@ -31,6 +31,14 @@ function detectSource(o: ShopifyOrder): string {
   return o.paymentGatewayNames[0] ?? "Website";
 }
 
+/** "Lufra Imran Imran" → "Lufra Imran", "Sheetal ." → "Sheetal" (Shopify first names often include the surname). */
+export function cleanName(raw: string | null | undefined): string {
+  const words = (raw ?? "").replace(/\s+/g, " ").trim().split(" ").filter((w) => !/^[.\-_,]+$/.test(w));
+  const out: string[] = [];
+  for (const w of words) if (!out.length || out[out.length - 1].toLowerCase() !== w.toLowerCase()) out.push(w);
+  return out.join(" ");
+}
+
 function mapItems(o: ShopifyOrder): OrderItem[] {
   return o.lineItems.nodes.map((li) => {
     const size = sizeFromVariantTitle(li.variantTitle);
@@ -69,7 +77,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
   const shopifyOwned = {
     shopify_id: shopifyId,
     order_number: o.name,
-    customer_name: o.customer?.displayName || o.shippingAddress?.name || o.email || "Customer",
+    customer_name: cleanName(o.customer?.displayName || o.shippingAddress?.name) || o.email || "Customer",
     customer_email: o.email,
     customer_phone: o.phone || o.shippingAddress?.phone || null,
     items: mapItems(o),
