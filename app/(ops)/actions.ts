@@ -295,13 +295,17 @@ export async function inviteMember(_: ActionResult | null, form: FormData): Prom
   if (existing) {
     await admin.from("profiles").update({ active: true, role }).eq("id", existing.id);
   } else {
-    const { error } = await admin.auth.admin.createUser({
+    const { data: created, error } = await admin.auth.admin.createUser({
       email,
       email_confirm: true,
       app_metadata: { invited_role: role },
       user_metadata: { full_name: str(form, "full_name") },
     });
     if (error) return { ok: false, message: error.message };
+    // Don't rely only on the database trigger — make sure the profile exists.
+    await admin
+      .from("profiles")
+      .upsert({ id: created.user.id, email, full_name: str(form, "full_name"), role, active: true }, { onConflict: "id", ignoreDuplicates: true });
   }
   refreshAll();
   return { ok: true, message: `${email} can now sign in at ${await siteUrl()}` };

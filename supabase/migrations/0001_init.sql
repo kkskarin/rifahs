@@ -278,3 +278,31 @@ grant execute on function public.is_team_member(), public.is_team_admin() to aut
 
 revoke execute on function public.ops_summary(), public.order_status_counts(), public.money_by_month(int) from public, anon;
 grant execute on function public.ops_summary(), public.order_status_counts(), public.money_by_month(int) to authenticated;
+
+-- Supabase Auth writes app_metadata in a follow-up update after inserting the user,
+-- so also react to that update. handle_new_user() is idempotent.
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if exists (select 1 from profiles where id = new.id) then
+    return new;
+  end if;
+  if new.raw_app_meta_data ->> 'bootstrap_owner' = 'true' and not exists (select 1 from profiles) then
+    insert into profiles (id, email, full_name, role)
+    values (new.id, new.email, coalesce(new.raw_user_meta_data ->> 'full_name', ''), 'owner');
+  elsif new.raw_app_meta_data ->> 'invited_role' is not null then
+    insert into profiles (id, email, full_name, role)
+    values (new.id, new.email,
+            coalesce(new.raw_user_meta_data ->> 'full_name', ''),
+            (new.raw_app_meta_data ->> 'invited_role')::team_role)
+    on conflict (id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_updated
+  after update of raw_app_meta_data on auth.users
+  for each row execute function public.handle_new_user();
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;

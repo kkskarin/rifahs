@@ -24,11 +24,16 @@ export async function sendCode(_: LoginState, form: FormData): Promise<LoginStat
     if (!owner || email !== owner) {
       return { step: "email", error: "This workspace hasn't been set up yet. Ask the owner to sign in first." };
     }
-    const { error } = await admin.auth.admin.createUser({
+    const { data: created, error } = await admin.auth.admin.createUser({
       email,
       email_confirm: true,
       app_metadata: { bootstrap_owner: true },
     });
+    if (created?.user) {
+      await admin
+        .from("profiles")
+        .upsert({ id: created.user.id, email, role: "owner", active: true }, { onConflict: "id", ignoreDuplicates: true });
+    }
     if (error && !/already/i.test(error.message)) return { step: "email", error: error.message };
     if (error) {
       // The auth user already existed (e.g. signed up earlier) — attach the owner profile directly.
