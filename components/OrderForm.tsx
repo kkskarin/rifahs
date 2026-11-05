@@ -1,22 +1,57 @@
 "use client";
 
-import { useActionState } from "react";
-import { saveOrder, type ActionResult } from "@/app/(ops)/actions";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { itemsLine } from "@/lib/format";
-import { SOURCES, STATUSES, STATUS_LABEL, COURIERS, type Order } from "@/lib/types";
+import { saveOrder, useMe } from "@/lib/store";
+import { COURIERS, SOURCES, STATUSES, STATUS_LABEL, type Order, type OrderStatus } from "@/lib/types";
 
 export default function OrderForm({ order }: { order?: Order }) {
-  const [state, action, pending] = useActionState<ActionResult | null, FormData>(saveOrder, null);
+  const router = useRouter();
+  const { data: me } = useMe();
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<{ ok: boolean; message?: string } | null>(null);
   const fromShopify = Boolean(order?.shopify_id);
   const sizes = new Set(order?.items.map((i) => i.size).filter(Boolean));
   const commonSize = sizes.size === 1 ? [...sizes][0]! : "";
 
   return (
-    <form action={action} className="panel">
+    <form
+      className="panel"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!me) return;
+        const f = new FormData(e.currentTarget);
+        const v = (k: string) => String(f.get(k) ?? "").trim();
+        const n = (k: string) => v(k) || null;
+        const b = (k: string) => f.get(k) === "on";
+        setBusy(true);
+        const r = await saveOrder(me, order ?? null, {
+          customer_name: v("customer_name"),
+          customer_phone: n("customer_phone"),
+          customer_email: n("customer_email"),
+          status: v("status") as OrderStatus,
+          is_express: b("is_express"),
+          is_international: b("is_international"),
+          is_internal: b("is_internal"),
+          promise_date: n("promise_date"),
+          ship_country: n("ship_country"),
+          courier: n("courier"),
+          tracking_number: n("tracking_number"),
+          notes: v("notes"),
+          items_raw: v("items"),
+          size: n("size"),
+          total: v("total"),
+          source: n("source"),
+          channel: v("channel"),
+          order_number: n("order_number"),
+        });
+        setBusy(false);
+        setState(r);
+        if (r.ok && !order && r.id) router.replace(`/order?id=${r.id}`);
+      }}
+    >
       <h2>{order ? "Order details" : "Add an entry"}</h2>
-      {order && <input type="hidden" name="id" value={order.id} />}
-      <input type="hidden" name="is_shopify" value={String(fromShopify)} />
-
       <div className="grid">
         <label className="field">
           <span>Customer</span>
@@ -53,7 +88,9 @@ export default function OrderForm({ order }: { order?: Order }) {
               <textarea
                 name="items"
                 placeholder={"Monochrome Muse\nZiya Plum Set (M) x2"}
-                defaultValue={order?.items.map((i) => `${i.title}${i.size && i.size !== commonSize ? ` (${i.size})` : ""}${i.quantity > 1 ? ` x${i.quantity}` : ""}`).join("\n")}
+                defaultValue={order?.items
+                  .map((i) => `${i.title}${i.size && i.size !== commonSize ? ` (${i.size})` : ""}${i.quantity > 1 ? ` x${i.quantity}` : ""}`)
+                  .join("\n")}
               />
             </label>
             <label className="field">
@@ -66,7 +103,7 @@ export default function OrderForm({ order }: { order?: Order }) {
             </label>
             <label className="field">
               <span>Order #</span>
-              <input name="order_number" defaultValue={order?.order_number ?? ""} placeholder="#1272 (optional)" />
+              <input name="order_number" defaultValue={order?.order_number ?? ""} placeholder="#1290 (optional)" />
             </label>
             <label className="field">
               <span>Source</span>
@@ -117,25 +154,21 @@ export default function OrderForm({ order }: { order?: Order }) {
           <label className="checkbox">
             <input type="checkbox" name="is_international" defaultChecked={order?.is_international} /> International
           </label>
-          <label className="checkbox" title="Staff / test orders: hidden from the order list and left out of sales">
+          <label className="checkbox" title="Staff / test orders: never counted in sales, profit or order counts">
             <input type="checkbox" name="is_internal" defaultChecked={order?.is_internal} /> Internal / test order
           </label>
         </div>
 
         <label className="field full">
           <span>Notes</span>
-          <textarea
-            name="notes"
-            defaultValue={order?.notes}
-            placeholder="Indigo Bloom ready. Whispers Of Blue and Blush Posey due Wednesday."
-          />
+          <textarea name="notes" defaultValue={order?.notes} placeholder="Indigo Bloom ready. Whispers Of Blue and Blush Posey due Wednesday." />
         </label>
       </div>
 
       {state && <p className={state.ok ? "success" : "error"}>{state.message}</p>}
       <div className="form-actions">
-        <button className="btn primary" disabled={pending}>
-          {pending ? "Saving…" : order ? "Save changes" : "Add to the book"}
+        <button className="btn primary" disabled={busy || !me}>
+          {busy ? "Saving…" : order ? "Save changes" : "Add to the book"}
         </button>
       </div>
     </form>

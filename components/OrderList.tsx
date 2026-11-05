@@ -1,31 +1,37 @@
 "use client";
 
-import { safe } from "@/lib/safe";
 import Link from "next/link";
-import { useState, useTransition, useActionState } from "react";
-import { advanceOrder, bulkSetStatus, dispatchOrder, type ActionResult } from "@/app/(ops)/actions";
+import { memo, useState } from "react";
 import { daysUntil, itemsLine, money, shortDate } from "@/lib/format";
-import { COURIERS, STATUSES, STATUS_LABEL, nextStatus, type Order, type OrderStatus } from "@/lib/types";
+import { dispatch, setStatus, useMe } from "@/lib/store";
+import { COURIERS, OPEN_STATUSES, STATUSES, STATUS_LABEL, nextStatus, type Order, type OrderStatus } from "@/lib/types";
 
-export default function OrderList({ orders, shopifyReady }: { orders: Order[]; shopifyReady: boolean }) {
+export default function OrderList({ orders }: { orders: Order[] }) {
+  const { data: me } = useMe();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkTo, setBulkTo] = useState<OrderStatus | "next">("next");
-  const [pending, start] = useTransition();
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [limit, setLimit] = useState(60);
 
   const toggle = (id: string) =>
     setSelected((s) => {
       const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
 
   if (!orders.length) return <p className="empty">Nothing here — all caught up.</p>;
+  const shown = orders.slice(0, limit);
 
   return (
     <>
-      <div className="toolbar" style={{ justifyContent: "flex-end", marginTop: -4 }}>
+      <div className="toolbar" style={{ justifyContent: "space-between", marginTop: -4 }}>
+        <span className="hint">
+          {orders.length} order{orders.length === 1 ? "" : "s"}
+        </span>
         <button
           className="btn small ghost"
           onClick={() => {
@@ -38,19 +44,19 @@ export default function OrderList({ orders, shopifyReady }: { orders: Order[]; s
       </div>
 
       <div className="list">
-        {orders.map((o) => (
-          <OrderCard
-            key={o.id}
-            o={o}
-            selecting={selecting}
-            selected={selected.has(o.id)}
-            onToggle={() => toggle(o.id)}
-            shopifyReady={shopifyReady}
-          />
+        {shown.map((o) => (
+          <OrderCard key={o.id} o={o} selecting={selecting} selected={selected.has(o.id)} onToggle={toggle} />
         ))}
       </div>
+      {orders.length > limit && (
+        <div className="form-actions" style={{ justifyContent: "center" }}>
+          <button className="btn ghost" onClick={() => setLimit((l) => l + 100)}>
+            Show more ({orders.length - limit} left)
+          </button>
+        </div>
+      )}
 
-      {selecting && (
+      {selecting && me && (
         <div className="bulkbar">
           <span>{selected.size} selected</span>
           <button className="btn small" onClick={() => setSelected(new Set(orders.map((o) => o.id)))}>
@@ -66,16 +72,16 @@ export default function OrderList({ orders, shopifyReady }: { orders: Order[]; s
           </select>
           <button
             className="btn small"
-            disabled={pending || !selected.size}
-            onClick={() =>
-              start(async () => {
-                const r = (await safe(() => bulkSetStatus([...selected], bulkTo))) as { message?: string };
-                setMsg(r.message ?? null);
-                setSelected(new Set());
-              })
-            }
+            disabled={busy || !selected.size}
+            onClick={async () => {
+              setBusy(true);
+              const r = await setStatus(me, orders.filter((o) => selected.has(o.id)), bulkTo);
+              setMsg(r.message ?? null);
+              setSelected(new Set());
+              setBusy(false);
+            }}
           >
-            {pending ? "Saving…" : "Apply"}
+            {busy ? "Saving…" : "Apply"}
           </button>
           {msg && <span style={{ opacity: 0.8 }}>{msg}</span>}
         </div>
@@ -84,29 +90,27 @@ export default function OrderList({ orders, shopifyReady }: { orders: Order[]; s
   );
 }
 
-function OrderCard({
+const OrderCard = memo(function OrderCard({
   o,
   selecting,
   selected,
   onToggle,
-  shopifyReady,
 }: {
   o: Order;
   selecting: boolean;
   selected: boolean;
-  onToggle: () => void;
-  shopifyReady: boolean;
+  onToggle: (id: string) => void;
 }) {
-  const [pending, start] = useTransition();
+  const { data: me } = useMe();
   const [dispatching, setDispatching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const next = nextStatus(o.status);
   const due = daysUntil(o.promise_date);
-  const open = ["new", "printing", "stitching", "checking", "ready"].includes(o.status);
+  const open = OPEN_STATUSES.includes(o.status);
 
   return (
-    <article className={`card${selected ? " selected" : ""}`} onClick={selecting ? onToggle : undefined}>
-      {selecting && <input type="checkbox" className="check" checked={selected} onChange={onToggle} aria-label="Select" />}
+    <article className={`card${selected ? " selected" : ""}`} onClick={selecting ? () => onToggle(o.id) : undefined}>
+      {selecting && <input type="checkbox" className="check" checked={selected} onChange={() => onToggle(o.id)} aria-label="Select" />}
       <div className="row1">
         <div>
           <span className="name">{o.customer_name}</span>
@@ -116,6 +120,7 @@ function OrderCard({
       </div>
       <div className="row2">
         <span className={`pill ${o.status}`}>{STATUS_LABEL[o.status]}</span>
+        {o.is_internal && <span className="flag late">Internal</span>}
         {o.is_express && <span className="flag express">Express</span>}
         {o.is_international && <span className="flag intl">International{o.ship_country ? ` · ${o.ship_country}` : ""}</span>}
         {o.is_express && open && due !== null && (
@@ -125,7 +130,6 @@ function OrderCard({
         )}
         <span className="items">{itemsLine(o.items)}</span>
         {o.source && <span className="meta">{o.source}</span>}
-        <span className="meta">{o.channel}</span>
         <span className="meta">{shortDate(o.placed_at)}</span>
       </div>
       {o.notes && <div className="note">{o.notes}</div>}
@@ -143,16 +147,17 @@ function OrderCard({
           </span>
         </div>
       )}
-      {!selecting && (
+      {!selecting && me && (
         <div className="actions">
           {next && next !== "dispatched" && (
-            <button className="advance" disabled={pending} onClick={() =>
-                start(async () => {
-                  const r = (await safe(() => advanceOrder(o.id))) as { ok: boolean; message?: string };
-                  setErr(r.ok ? null : (r.message ?? "Couldn't update"));
-                })
-              }>
-              {pending ? "Saving…" : `Mark ${STATUS_LABEL[next]} →`}
+            <button
+              className="advance"
+              onClick={async () => {
+                const r = await setStatus(me, [o], "next");
+                setErr(r.ok ? null : (r.message ?? "Couldn't update"));
+              }}
+            >
+              Mark {STATUS_LABEL[next]} →
             </button>
           )}
           {next === "dispatched" && !dispatching && (
@@ -165,22 +170,36 @@ function OrderCard({
               Ship now
             </button>
           )}
-          <Link href={`/orders/${o.id}`} className="link">
+          <Link href={`/order?id=${o.id}`} className="link">
             Edit
           </Link>
           {err && <span className="error">{err}</span>}
         </div>
       )}
-      {dispatching && <DispatchForm o={o} shopifyReady={shopifyReady} onClose={() => setDispatching(false)} />}
+      {dispatching && <DispatchForm o={o} onClose={() => setDispatching(false)} />}
     </article>
   );
-}
+});
 
-export function DispatchForm({ o, shopifyReady, onClose }: { o: Order; shopifyReady: boolean; onClose?: () => void }) {
-  const [state, action, pending] = useActionState<ActionResult | null, FormData>(dispatchOrder, null);
+export function DispatchForm({ o, onClose }: { o: Order; onClose?: () => void }) {
+  const { data: me } = useMe();
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<{ ok: boolean; message?: string } | null>(null);
   return (
-    <form action={action} style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-      <input type="hidden" name="id" value={o.id} />
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!me) return;
+        const f = new FormData(e.currentTarget);
+        const v = (k: string) => String(f.get(k) ?? "").trim() || null;
+        setBusy(true);
+        const r = await dispatch(me, o, { courier: v("courier"), tracking_number: v("tracking_number"), tracking_url: v("tracking_url") });
+        setBusy(false);
+        setState(r);
+        if (r.ok) onClose?.();
+      }}
+      style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}
+    >
       <div className="grid">
         <label className="field">
           <span>Courier</span>
@@ -200,15 +219,15 @@ export function DispatchForm({ o, shopifyReady, onClose }: { o: Order; shopifyRe
           <option key={c} value={c} />
         ))}
       </datalist>
-      {state && <p className={state.ok ? "success" : "error"}>{state.message}</p>}
+      {state && !state.ok && <p className="error">{state.message}</p>}
       <div className="form-actions">
         {onClose && (
           <button type="button" className="btn small ghost" onClick={onClose}>
             Cancel
           </button>
         )}
-        <button className="btn small primary" disabled={pending}>
-          {pending ? "Saving…" : "Dispatch"}
+        <button className="btn small primary" disabled={busy}>
+          {busy ? "Saving…" : "Dispatch"}
         </button>
       </div>
     </form>

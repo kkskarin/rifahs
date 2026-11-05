@@ -1,6 +1,6 @@
-import OrderForm from "@/components/OrderForm";
+"use client";
 
-export const metadata = { title: "Add entry" };
+import OrderForm from "@/components/OrderForm";
 
 export default function NewOrderPage() {
   return <OrderForm />;

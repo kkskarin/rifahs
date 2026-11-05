@@ -1,61 +1,58 @@
+"use client";
+
 import Link from "next/link";
-import { Suspense } from "react";
-import { listOrders, getStatusCounts, getInternalCount } from "@/lib/data";
-import { shopifyConfigured } from "@/lib/shopify";
-import { OPEN_STATUSES, STATUSES, STATUS_LABEL, type OrderStatus } from "@/lib/types";
+import { useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 import OrderList from "@/components/OrderList";
 import SearchBox from "@/components/SearchBox";
-
-export const metadata = { title: "Orders" };
+import { downloadOrdersCsv } from "@/lib/csv";
+import { matches } from "@/lib/search";
+import { isOpen, useOrders } from "@/lib/store";
+import { STATUSES, STATUS_LABEL, type OrderStatus } from "@/lib/types";
 
 type Filter = "open" | "all" | "internal" | OrderStatus;
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string }> }) {
-  const sp = await searchParams;
-  const f = (sp.f ?? "open") as Filter;
-  const statuses = f === "open" ? OPEN_STATUSES : f === "all" || f === "internal" ? undefined : [f as OrderStatus];
-  const [counts, orders, internalCount] = await Promise.all([
-    getStatusCounts(),
-    listOrders({ statuses, q: sp.q, internalOnly: f === "internal" }),
-    getInternalCount(),
-  ]);
-  const n = (s: OrderStatus) => counts[s] ?? 0;
-  const total = STATUSES.reduce((a, s) => a + n(s), 0);
-  const openCount = OPEN_STATUSES.reduce((a, s) => a + n(s), 0);
+export default function OrdersPage() {
+  const sp = useSearchParams();
+  const f = (sp.get("f") ?? "open") as Filter;
+  const q = sp.get("q") ?? "";
+  const { data: all, error } = useOrders();
 
-  const chips: { f: Filter; label: string; n: number }[] = [
-    { f: "open", label: "Not dispatched", n: openCount },
-    { f: "all", label: "All", n: total },
-    ...STATUSES.filter((s) => n(s) > 0).map((s) => ({ f: s as Filter, label: STATUS_LABEL[s], n: n(s) })),
-    ...(internalCount ? [{ f: "internal" as Filter, label: "Internal / test", n: internalCount }] : []),
-  ];
+  const { list, chips } = useMemo(() => {
+    const orders = all ?? [];
+    const real = orders.filter((o) => !o.is_internal);
+    const count = (s: OrderStatus) => real.filter((o) => o.status === s).length;
+    const internal = orders.length - real.length;
+    const chips: { f: Filter; label: string; n: number }[] = [
+      { f: "open", label: "Not dispatched", n: real.filter(isOpen).length },
+      { f: "all", label: "All", n: real.length },
+      ...STATUSES.filter((s) => count(s) > 0).map((s) => ({ f: s as Filter, label: STATUS_LABEL[s], n: count(s) })),
+      ...(internal ? [{ f: "internal" as Filter, label: "Internal / test", n: internal }] : []),
+    ];
+    const base =
+      f === "internal" ? orders.filter((o) => o.is_internal) : f === "open" ? real.filter(isOpen) : f === "all" ? real : real.filter((o) => o.status === f);
+    return { list: base.filter((o) => matches(o, q)), chips };
+  }, [all, f, q]);
 
-  const csvHref = `/api/orders/csv?${new URLSearchParams({ f, ...(sp.q ? { q: sp.q } : {}) })}`;
+  const href = (nf: Filter) => `/orders?${new URLSearchParams({ f: nf, ...(q ? { q } : {}) })}`;
 
   return (
     <>
       <div className="toolbar">
-        <Suspense>
-          <SearchBox />
-        </Suspense>
-        <a className="btn ghost" href={csvHref}>
+        <SearchBox />
+        <button className="btn ghost" onClick={() => downloadOrdersCsv(list, f)} disabled={!all}>
           Download CSV
-        </a>
+        </button>
       </div>
       <nav className="chips" aria-label="Filter by status">
         {chips.map((c) => (
-          <Link
-            key={c.f}
-            className="chip"
-            aria-current={c.f === f ? "true" : undefined}
-            href={`/orders?${new URLSearchParams({ f: c.f, ...(sp.q ? { q: sp.q } : {}) })}`}
-            scroll={false}
-          >
+          <Link key={c.f} className="chip" aria-current={c.f === f ? "true" : undefined} href={href(c.f)} scroll={false} replace>
             <b>{c.label}</b> {c.n}
           </Link>
         ))}
       </nav>
-      <OrderList orders={orders} shopifyReady={shopifyConfigured()} />
+      {error ? <p className="error">Couldn&apos;t load orders: {String(error.message ?? error)}</p> : null}
+      {all ? <OrderList orders={list} /> : <p className="empty">Loading orders…</p>}
     </>
   );
 }

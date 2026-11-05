@@ -1,26 +1,27 @@
-import Link from "next/link";
-import { listOrders } from "@/lib/data";
-import { shopifyConfigured } from "@/lib/shopify";
-import { OPEN_STATUSES } from "@/lib/types";
+"use client";
+
+import { useMemo, useState } from "react";
 import OrderList from "@/components/OrderList";
+import { isOpen, useOrders } from "@/lib/store";
 
-export const metadata = { title: "International" };
-
-export default async function InternationalPage({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
-  const { f } = await searchParams;
-  const showAll = f === "all";
-  const orders = await listOrders({ international: true, statuses: showAll ? undefined : OPEN_STATUSES });
+export default function InternationalPage() {
+  const { data } = useOrders();
+  const [all, setAll] = useState(false);
+  const list = useMemo(
+    () => (data ?? []).filter((o) => !o.is_internal && o.is_international && (all || isOpen(o))),
+    [data, all],
+  );
   return (
     <>
       <nav className="chips">
-        <Link className="chip" aria-current={!showAll ? "true" : undefined} href="/international">
+        <button className="chip" aria-current={!all ? "true" : undefined} onClick={() => setAll(false)}>
           <b>In progress</b>
-        </Link>
-        <Link className="chip" aria-current={showAll ? "true" : undefined} href="/international?f=all">
+        </button>
+        <button className="chip" aria-current={all ? "true" : undefined} onClick={() => setAll(true)}>
           <b>All international</b>
-        </Link>
+        </button>
       </nav>
-      <OrderList orders={orders} shopifyReady={shopifyConfigured()} />
+      {data ? <OrderList orders={list} /> : <p className="empty">Loading…</p>}
     </>
   );
 }

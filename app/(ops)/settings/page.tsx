@@ -1,20 +1,22 @@
-import { requireAdmin } from "@/lib/session";
-import { supabaseServer } from "@/lib/supabase-server";
-import { shopifyAdminUrl, shopifyConfigured } from "@/lib/shopify";
+"use client";
+
+import { useState } from "react";
+import { mutate } from "swr";
+import { syncShopifyNow } from "../actions";
 import { dateTime } from "@/lib/format";
-import ShopifyButtons from "@/components/ShopifyButtons";
+import { isAdmin } from "@/lib/roles";
+import { safe } from "@/lib/safe";
+import { useMe, useSyncState } from "@/lib/store";
 
-export const metadata = { title: "Shopify" };
+const SHOP = "xd1uww-uu.myshopify.com";
 
-export default async function SettingsPage() {
-  await requireAdmin();
-  const db = await supabaseServer();
-  const [{ data: state }, { count: synced }] = await Promise.all([
-    db.from("sync_state").select("value, updated_at").eq("key", "shopify_orders").maybeSingle(),
-    db.from("orders").select("id", { count: "exact", head: true }).not("shopify_id", "is", null),
-  ]);
-  const ready = shopifyConfigured();
-  const store = process.env.SHOPIFY_STORE_DOMAIN ?? "xd1uww-uu.myshopify.com";
+export default function SettingsPage() {
+  const { data: me } = useMe();
+  const admin = me ? isAdmin(me) : false;
+  const { data: sync } = useSyncState(admin);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; message?: string } | null>(null);
+  if (me && !admin) return <p className="empty">Only owners and admins manage Shopify.</p>;
 
   return (
     <div className="panel">
@@ -24,32 +26,43 @@ export default async function SettingsPage() {
           <tr>
             <td>Store</td>
             <td>
-              <a className="link" href={shopifyAdminUrl()} target="_blank" rel="noreferrer">
-                {store} ↗
+              <a className="link" href="https://admin.shopify.com/store/xd1uww-uu" target="_blank" rel="noreferrer">
+                {SHOP} ↗
               </a>
             </td>
           </tr>
           <tr>
-            <td>API access</td>
-            <td className={ready ? "success" : "error"}>{ready ? "Connected" : "Not set up — add the Shopify keys to the server"}</td>
-          </tr>
-          <tr>
             <td>Orders from Shopify</td>
-            <td>{synced ?? 0}</td>
+            <td>{sync ? sync.synced : "…"}</td>
           </tr>
           <tr>
             <td>Last sync</td>
-            <td>{state?.updated_at ? dateTime(state.updated_at) : "Never"}</td>
+            <td>{sync ? (sync.updatedAt ? dateTime(sync.updatedAt) : "Never") : "…"}</td>
           </tr>
         </tbody>
       </table>
       <p className="hint">
-        This app only <b>reads</b> from Shopify — it never changes orders, fulfilments or settings there.
-        New and updated orders are pulled in automatically every 10 minutes; press Sync to pull them now.
-        Your team&apos;s statuses and notes are never overwritten — Shopify only moves an order forward when it&apos;s
-        fulfilled, cancelled or refunded there.
+        This app only <b>reads</b> from Shopify — it never changes orders, fulfilments or settings there. New and updated
+        orders are pulled in automatically every 10 minutes; press Sync to pull them now. Your team&apos;s statuses and notes
+        are never overwritten.
       </p>
-      <ShopifyButtons disabled={!ready} />
+      <div className="form-actions" style={{ justifyContent: "flex-start" }}>
+        <button
+          className="btn primary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            const r = (await safe(syncShopifyNow)) as { ok: boolean; message?: string };
+            setBusy(false);
+            setMsg(r);
+            mutate("orders");
+            mutate("sync");
+          }}
+        >
+          {busy ? "Syncing…" : "Sync orders now"}
+        </button>
+      </div>
+      {msg && <p className={msg.ok ? "success" : "error"}>{msg.message}</p>}
     </div>
   );
 }
