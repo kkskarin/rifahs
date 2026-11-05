@@ -1,0 +1,22 @@
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Inter } from "next/font/google";
+import "./globals.css";
+
+const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], variable: "--font-fraunces", display: "swap" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+
+export const metadata: Metadata = {
+  title: { default: "Order Book · Rifah's", template: "%s · Rifah's Ops" },
+  description: "Orders, express promises, international parcels, courier issues and money — for the Rifah's team.",
+  robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = { themeColor: "#F4EAC4" };
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en-IN" className={`${fraunces.variable} ${inter.variable}`}>
+      <body>{children}</body>
+    </html>
+  );
+}

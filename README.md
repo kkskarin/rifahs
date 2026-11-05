@@ -1,1 +1,70 @@
-# rifahs
+# Rifah's Ops — ops.rifahs.com
+
+The team's order book for **Kaleidoscope by Rifah**: orders, express promises, international parcels,
+courier issues and money in one place. It syncs live with the Shopify store and has invite-only team login.
+
+Styled after rifahs.com: cream `#F4EAC4`, cocoa ink `#2A1416`, wine `#822537`, Fraunces + Inter.
+
+## What it does
+
+| Tab | |
+|---|---|
+| **Orders** | Every order (Shopify + manual entries). Filter by status, search by name/product/order #/AWB, bulk-select, CSV export. One tap moves an order along **New → Printing → Stitching → Checking → Ready → Dispatched → Delivered**. |
+| **Express** | Express orders still to ship, soonest promise date first, flagged when late. |
+| **International** | Overseas orders in progress (auto-detected from the shipping country). |
+| **Issues** | Courier problems, damages, returns and exchanges, linked to orders. |
+| **Money** *(admins)* | Sales vs expenses by month, expense log by category, approx. profit. |
+| **Team** *(admins)* | Give or remove access; roles: Owner, Admin, Staff (staff never see money). |
+| **Shopify** *(admins)* | Connection status, "Sync now", and one-click webhook setup. |
+
+**Shopify sync:** new/updated/cancelled/refunded orders arrive instantly through webhooks, plus an
+hourly safety-net sync. The team's statuses and notes are never overwritten; Shopify only moves an
+order forward (fulfilled → Dispatched, cancelled, refunded). When you dispatch from here you can
+optionally mark it fulfilled in Shopify with the AWB, which sends the customer Shopify's shipping email.
+
+**Login:** email + 6-digit code (no passwords). Only people added on the Team page can sign in.
+Every status change is logged with who did it.
+
+## Stack
+
+Next.js 15 (App Router) · Supabase (Postgres, Auth, row-level security) · Shopify Admin GraphQL API · Netlify.
+
+## Setup
+
+### 1. Supabase — project "Rifah's Kaleidoscope" (`cqirofbbxoedbirijnva`, Mumbai)
+The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remaining dashboard settings:
+1. Authentication → Sign In / Providers → Email: **turn off "Allow new users to sign up"**
+   (the app creates users itself; anyone signing up directly would get no access anyway).
+2. Authentication → Email Templates → *Magic Link*: make the email show the code, e.g.
+   `Your Rifah's sign-in code is <b>{{ .Token }}</b>` and the link
+   `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`.
+3. Authentication → URL Configuration → Site URL `https://ops.rifahs.com`, and add
+   `https://ops.rifahs.com/**` to Redirect URLs.
+4. Recommended: Authentication → SMTP → your own sender (e.g. `ops@rifahs.com` via Zoho/Resend);
+   Supabase's built-in mailer only sends a few emails an hour.
+5. Project Settings → API Keys → copy the **secret** key for `SUPABASE_SERVICE_ROLE_KEY`.
+
+### 2. Shopify app
+1. Shopify **Dev Dashboard** → create an app → Admin API scopes:
+   `read_orders, read_all_orders, write_orders, read_merchant_managed_fulfillment_orders, write_merchant_managed_fulfillment_orders, read_customers`.
+2. Install it on `xd1uww-uu.myshopify.com`; copy the **Client ID** and **Client secret**.
+
+### 3. Netlify
+1. Add new site → Import from GitHub → `kkskarin/rifahs`. Build settings come from `netlify.toml`.
+2. Site configuration → Environment variables → add everything from `.env.example`
+   (`CRON_SECRET`: any long random string; `BOOTSTRAP_OWNER_EMAIL`: the owner's email).
+3. Domain management → add `ops.rifahs.com`. At your DNS provider add a **CNAME**
+   `ops → <your-site>.netlify.app`. rifahs.com itself stays on Shopify — only `ops` points to Netlify.
+4. Open https://ops.rifahs.com and sign in with the bootstrap email — you become Owner.
+5. **Shopify tab → Sync orders now** (press until it says done — first run pulls the full history
+   in batches), then **Connect live updates** to register the webhooks.
+6. **Team tab** → add Amma and the team.
+
+The hourly safety-net sync is `netlify/functions/shopify-sync.mjs` (a Netlify scheduled function).
+
+## Local development
+```bash
+cp .env.example .env.local   # fill in
+npm install
+npm run dev
+```
