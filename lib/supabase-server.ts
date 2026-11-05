@@ -24,7 +24,7 @@ export async function supabaseServer() {
   );
 }
 
-/** Service-role client. Bypasses RLS — server-only, for webhooks/sync/team admin. */
+/** Service-role client. Bypasses RLS — server-only, for Shopify sync and team admin. */
 export function supabaseAdmin() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set in Netlify's environment variables");

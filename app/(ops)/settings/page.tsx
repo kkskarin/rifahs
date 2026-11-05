@@ -44,9 +44,10 @@ export default async function SettingsPage() {
         </tbody>
       </table>
       <p className="hint">
-        New and updated orders arrive instantly through webhooks; a background sync runs every hour as a safety net. Your
-        team&apos;s statuses and notes are never overwritten — Shopify only moves an order forward when it&apos;s fulfilled,
-        cancelled or refunded there.
+        This app only <b>reads</b> from Shopify — it never changes orders, fulfilments or settings there.
+        New and updated orders are pulled in automatically every 10 minutes; press Sync to pull them now.
+        Your team&apos;s statuses and notes are never overwritten — Shopify only moves an order forward when it&apos;s
+        fulfilled, cancelled or refunded there.
       </p>
       <ShopifyButtons disabled={!ready} />
     </div>

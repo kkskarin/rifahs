@@ -178,7 +178,6 @@ function OrderCard({
 
 export function DispatchForm({ o, shopifyReady, onClose }: { o: Order; shopifyReady: boolean; onClose?: () => void }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(dispatchOrder, null);
-  const canShopify = shopifyReady && Boolean(o.shopify_id) && !o.shopify_fulfilled;
   return (
     <form action={action} style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
       <input type="hidden" name="id" value={o.id} />
@@ -201,16 +200,6 @@ export function DispatchForm({ o, shopifyReady, onClose }: { o: Order; shopifyRe
           <option key={c} value={c} />
         ))}
       </datalist>
-      {canShopify && (
-        <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
-          <label className="checkbox">
-            <input type="checkbox" name="shopify" defaultChecked /> Mark fulfilled in Shopify too
-          </label>
-          <label className="checkbox">
-            <input type="checkbox" name="notify" defaultChecked /> Send the customer Shopify&apos;s shipping email
-          </label>
-        </div>
-      )}
       {state && <p className={state.ok ? "success" : "error"}>{state.message}</p>}
       <div className="form-actions">
         {onClose && (

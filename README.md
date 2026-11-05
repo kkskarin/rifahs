@@ -15,12 +15,12 @@ Styled after rifahs.com: cream `#F4EAC4`, cocoa ink `#2A1416`, wine `#822537`, F
 | **Issues** | Courier problems, damages, returns and exchanges, linked to orders. |
 | **Money** *(admins)* | Sales vs expenses by month, expense log by category, approx. profit. |
 | **Team** *(admins)* | Give or remove access; roles: Owner, Admin, Staff (staff never see money). |
-| **Shopify** *(admins)* | Connection status, "Sync now", and one-click webhook setup. |
+| **Shopify** *(admins)* | Connection status and "Sync now". Read-only — nothing is ever written to Shopify. |
 
-**Shopify sync:** new/updated/cancelled/refunded orders arrive instantly through webhooks, plus an
-hourly safety-net sync. The team's statuses and notes are never overwritten; Shopify only moves an
-order forward (fulfilled → Dispatched, cancelled, refunded). When you dispatch from here you can
-optionally mark it fulfilled in Shopify with the AWB, which sends the customer Shopify's shipping email.
+**Shopify sync (read-only):** the app never writes to Shopify. New and updated orders are pulled every
+10 minutes (and on "Sync orders now"). The team's statuses and notes are never overwritten; Shopify only
+moves an order forward (fulfilled → Dispatched, cancelled, refunded). Dispatching here does not touch
+Shopify.
 
 **Login:** email + 6-digit code (no passwords). Only people added on the Team page can sign in.
 Every status change is logged with who did it.
@@ -46,7 +46,7 @@ The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remain
 
 ### 2. Shopify app
 1. Shopify **Dev Dashboard** → create an app → Admin API scopes:
-   `read_orders, read_all_orders, write_orders, read_merchant_managed_fulfillment_orders, write_merchant_managed_fulfillment_orders, read_customers`.
+   `read_orders, read_customers` (add `read_all_orders` if Shopify grants it). No write scopes — the app is read-only.
 2. Install it on `xd1uww-uu.myshopify.com`; copy the **Client ID** and **Client secret**.
 
 ### 3. Netlify
@@ -56,13 +56,13 @@ The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remain
 3. Site configuration → change site name to `rifahs` so it lives at https://rifahs.netlify.app.
    *Later:* Domain management → add `ops.rifahs.com` and a DNS **CNAME** `ops → rifahs.netlify.app`
    (rifahs.com itself stays on Shopify). The app picks up the new address automatically; just add it
-   to Supabase's Redirect URLs and press **Connect live updates** again.
+   to Supabase's Redirect URLs.
 4. Open the site and sign in with the bootstrap email — you become Owner.
 5. **Shopify tab → Sync orders now** (press until it says done — first run pulls the full history
-   in batches), then **Connect live updates** to register the webhooks.
+   in batches). After that a read-only sync runs every 10 minutes.
 6. **Team tab** → add Amma and the team.
 
-The hourly safety-net sync is `netlify/functions/shopify-sync.mjs` (a Netlify scheduled function).
+The 10-minute read-only sync is `netlify/functions/shopify-sync.mjs` (a Netlify scheduled function).
 
 ## Local development
 ```bash

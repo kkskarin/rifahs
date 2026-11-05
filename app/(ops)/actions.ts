@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, requireMember } from "@/lib/session";
 import { supabaseAdmin, supabaseServer } from "@/lib/supabase-server";
-import { fulfillInShopify, registerWebhooks, shopifyConfigured } from "@/lib/shopify";
+import { shopifyConfigured } from "@/lib/shopify";
 import { syncBudgetMs, syncRecent } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
 import { STATUSES, nextStatus, type OrderItem, type OrderStatus, type TeamRole } from "@/lib/types";
@@ -65,25 +65,10 @@ export async function dispatchOrder(_: ActionResult | null, form: FormData): Pro
   const courier = optStr(form, "courier");
   const tracking = optStr(form, "tracking_number");
   const trackingUrl = optStr(form, "tracking_url");
-  const pushToShopify = bool(form, "shopify");
-  const notify = bool(form, "notify");
 
   const db = await supabaseServer();
-  const { data: order, error } = await db.from("orders").select("id, status, shopify_id").eq("id", id).single();
+  const { data: order, error } = await db.from("orders").select("id, status").eq("id", id).single();
   if (error) return { ok: false, message: error.message };
-
-  let shopifyMsg = "";
-  let shopifyFulfilled = false;
-  if (pushToShopify && order.shopify_id && shopifyConfigured()) {
-    try {
-      const r = await fulfillInShopify(order.shopify_id, { company: courier, number: tracking, url: trackingUrl }, notify);
-      if (!r.ok) return { ok: false, message: `Shopify: ${r.message}` };
-      shopifyMsg = ` · ${r.message}`;
-      shopifyFulfilled = true;
-    } catch (e) {
-      return { ok: false, message: `Shopify: ${(e as Error).message}` };
-    }
-  }
 
   const { error: e2 } = await db
     .from("orders")
@@ -94,7 +79,6 @@ export async function dispatchOrder(_: ActionResult | null, form: FormData): Pro
       tracking_url: trackingUrl,
       dispatched_at: new Date().toISOString(),
       updated_by: me.id,
-      ...(shopifyFulfilled ? { shopify_fulfilled: true } : {}),
     })
     .eq("id", id);
   if (e2) return { ok: false, message: e2.message };
@@ -104,11 +88,11 @@ export async function dispatchOrder(_: ActionResult | null, form: FormData): Pro
     kind: "fulfillment",
     from_status: order.status,
     to_status: "dispatched",
-    message: [courier, tracking].filter(Boolean).join(" · ") + shopifyMsg,
+    message: [courier, tracking].filter(Boolean).join(" · "),
     actor: me.id,
   });
   refreshAll();
-  return { ok: true, message: `Dispatched${shopifyMsg}` };
+  return { ok: true, message: "Dispatched" };
 }
 
 function parseItems(raw: string, size: string | null): OrderItem[] {
@@ -337,18 +321,6 @@ export async function syncShopifyNow(): Promise<ActionResult> {
       ok: true,
       message: `${r.created} new, ${r.updated} updated${r.done ? "" : " — more to fetch, press again"}`,
     };
-  } catch (e) {
-    return { ok: false, message: (e as Error).message };
-  }
-}
-
-export async function connectShopifyWebhooks(): Promise<ActionResult> {
-  await requireAdmin();
-  const site = await siteUrl();
-  if (!site.startsWith("https://")) return { ok: false, message: "Live updates need the site's https address — open the app from it and try again" };
-  try {
-    const r = await registerWebhooks(`${site}/api/shopify/webhooks`);
-    return { ok: true, message: r.join(" · ") };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }

@@ -1,5 +1,6 @@
 import "server-only";
-import crypto from "node:crypto";
+
+// READ-ONLY by design: this app never writes to Shopify (no mutations).
 
 const SHOP = process.env.SHOPIFY_STORE_DOMAIN ?? "xd1uww-uu.myshopify.com";
 const VERSION = process.env.SHOPIFY_API_VERSION ?? "2026-10";
@@ -63,16 +64,6 @@ export async function shopifyGraphQL<T>(query: string, variables: Record<string,
     return json.data as T;
   }
   throw new Error("Shopify API: too many retries");
-}
-
-// ── Webhook verification ───────────────────────────────────────
-export function verifyWebhook(rawBody: string, hmacHeader: string | null) {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-  if (!secret || !hmacHeader) return false;
-  const digest = crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
-  const a = Buffer.from(digest);
-  const b = Buffer.from(hmacHeader);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 // ── Orders ─────────────────────────────────────────────────────
@@ -173,73 +164,4 @@ export async function fetchOrdersPage(opts: { after?: string | null; query?: str
     { first: opts.first ?? 50, after: opts.after ?? null, query: opts.query ?? null },
   );
   return data.orders;
-}
-
-// ── Fulfilment (mark dispatched in Shopify, customer gets the shipping email) ──
-export async function fulfillInShopify(
-  legacyOrderId: number,
-  tracking: { company?: string | null; number?: string | null; url?: string | null },
-  notifyCustomer: boolean,
-) {
-  const fo = await shopifyGraphQL<{
-    order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } | null;
-  }>(
-    `query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status } } } }`,
-    { id: `gid://shopify/Order/${legacyOrderId}` },
-  );
-  const open = fo.order?.fulfillmentOrders.nodes.filter((n) => ["OPEN", "IN_PROGRESS", "SCHEDULED"].includes(n.status)) ?? [];
-  if (!open.length) return { ok: true as const, message: "Already fulfilled in Shopify" };
-
-  const trackingInfo: Record<string, string> = {};
-  if (tracking.company) trackingInfo.company = tracking.company;
-  if (tracking.number) trackingInfo.number = tracking.number;
-  if (tracking.url) trackingInfo.url = tracking.url;
-
-  const res = await shopifyGraphQL<{
-    fulfillmentCreate: { fulfillment: { id: string } | null; userErrors: { message: string }[] };
-  }>(
-    `mutation($f: FulfillmentInput!) {
-      fulfillmentCreate(fulfillment: $f) { fulfillment { id } userErrors { message } }
-    }`,
-    {
-      f: {
-        lineItemsByFulfillmentOrder: open.map((n) => ({ fulfillmentOrderId: n.id })),
-        notifyCustomer,
-        ...(Object.keys(trackingInfo).length ? { trackingInfo } : {}),
-      },
-    },
-  );
-  const errs = res.fulfillmentCreate.userErrors;
-  if (errs.length) return { ok: false as const, message: errs.map((e) => e.message).join("; ") };
-  return { ok: true as const, message: "Marked fulfilled in Shopify" };
-}
-
-// ── Webhook registration ───────────────────────────────────────
-export const WEBHOOK_TOPICS = ["ORDERS_CREATE", "ORDERS_UPDATED", "ORDERS_CANCELLED", "REFUNDS_CREATE"] as const;
-
-export async function registerWebhooks(callbackUrl: string) {
-  const existing = await shopifyGraphQL<{
-    webhookSubscriptions: { nodes: { id: string; topic: string; uri: string }[] };
-  }>(`{ webhookSubscriptions(first: 50) { nodes { id topic uri } } }`);
-
-  const results: string[] = [];
-  for (const topic of WEBHOOK_TOPICS) {
-    if (existing.webhookSubscriptions.nodes.some((n) => n.topic === topic && n.uri === callbackUrl)) {
-      results.push(`${topic}: already registered`);
-      continue;
-    }
-    const r = await shopifyGraphQL<{
-      webhookSubscriptionCreate: { userErrors: { message: string }[] };
-    }>(
-      `mutation($topic: WebhookSubscriptionTopic!, $uri: String!) {
-        webhookSubscriptionCreate(topic: $topic, webhookSubscription: { uri: $uri, format: JSON }) {
-          userErrors { message }
-        }
-      }`,
-      { topic, uri: callbackUrl },
-    );
-    const errs = r.webhookSubscriptionCreate.userErrors;
-    results.push(`${topic}: ${errs.length ? errs.map((e) => e.message).join("; ") : "registered"}`);
-  }
-  return results;
 }
