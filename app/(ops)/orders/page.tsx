@@ -13,13 +13,11 @@ type Filter = "open" | "all" | OrderStatus;
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string }> }) {
   const sp = await searchParams;
   const f = (sp.f ?? "open") as Filter;
-  const counts = await getStatusCounts();
+  const statuses = f === "open" ? OPEN_STATUSES : f === "all" ? undefined : [f];
+  const [counts, orders] = await Promise.all([getStatusCounts(), listOrders({ statuses, q: sp.q })]);
   const n = (s: OrderStatus) => counts[s] ?? 0;
   const total = STATUSES.reduce((a, s) => a + n(s), 0);
   const openCount = OPEN_STATUSES.reduce((a, s) => a + n(s), 0);
-
-  const statuses = f === "open" ? OPEN_STATUSES : f === "all" ? undefined : [f];
-  const orders = await listOrders({ statuses, q: sp.q });
 
   const chips: { f: Filter; label: string; n: number }[] = [
     { f: "open", label: "Not dispatched", n: openCount },

@@ -6,9 +6,15 @@ import { signOut } from "../login/actions";
 import Tabs from "@/components/Tabs";
 
 export default async function OpsLayout({ children }: { children: React.ReactNode }) {
-  const me = await requireMember();
+  // One parallel round trip: the profile check and the header numbers together.
+  // (Row-level security means the numbers are empty for anyone who isn't a member.)
+  const [me, summary, counts, intl] = await Promise.all([
+    requireMember(),
+    getSummary(),
+    getStatusCounts(),
+    getIntlOpenCount(),
+  ]);
   const admin = isAdmin(me);
-  const [summary, counts, intl] = await Promise.all([getSummary(), getStatusCounts(), getIntlOpenCount()]);
   const total = Object.values(counts).reduce((a, b) => a + (b ?? 0), 0);
 
   const tabs = [

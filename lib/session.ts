@@ -7,11 +7,11 @@ import type { Profile } from "./types";
 /** The signed-in, active team member. Redirects to /login otherwise. */
 export const requireMember = cache(async (): Promise<Profile> => {
   const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  // Verified locally with the project's signing key — no extra round trip to Supabase Auth.
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (!userId) redirect("/login");
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (!profile || !profile.active) redirect("/login?error=no-access");
   return profile as Profile;
 });

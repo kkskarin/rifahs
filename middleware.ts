@@ -22,9 +22,10 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the session token locally against the project's public
+  // signing key (cached), instead of a round trip to Supabase Auth on every page.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? data.claims : null;
 
   const path = request.nextUrl.pathname;
   if (!user && !PUBLIC.some((p) => path.startsWith(p))) {
