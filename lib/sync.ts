@@ -34,9 +34,15 @@ function detectSource(o: ShopifyOrder): string {
 /** "Lufra Imran Imran" → "Lufra Imran", "Sheetal ." → "Sheetal" (Shopify first names often include the surname). */
 export function cleanName(raw: string | null | undefined): string {
   const words = (raw ?? "").replace(/\s+/g, " ").trim().split(" ").filter((w) => !/^[.\-_,]+$/.test(w));
-  const out: string[] = [];
-  for (const w of words) if (!out.length || out[out.length - 1].toLowerCase() !== w.toLowerCase()) out.push(w);
-  return out.join(" ");
+  // Drop any run of 1–3 words that is immediately repeated ("Abdul azeez Abdul azeez").
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((w, i) => w.toLowerCase() === b[i].toLowerCase());
+  for (let k = 3; k >= 1; k--) {
+    for (let i = 0; i + 2 * k <= words.length; ) {
+      if (same(words.slice(i, i + k), words.slice(i + k, i + 2 * k))) words.splice(i + k, k);
+      else i++;
+    }
+  }
+  return words.join(" ");
 }
 
 function mapItems(o: ShopifyOrder): OrderItem[] {
