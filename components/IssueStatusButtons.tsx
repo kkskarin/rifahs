@@ -1,12 +1,13 @@
 "use client";
 
+import { safe } from "@/lib/safe";
 import { useTransition } from "react";
 import { setIssueStatus } from "@/app/(ops)/actions";
 import type { IssueStatus } from "@/lib/types";
 
 export default function IssueStatusButtons({ id, status }: { id: string; status: IssueStatus }) {
   const [pending, start] = useTransition();
-  const go = (s: IssueStatus) => start(() => setIssueStatus(id, s));
+  const go = (s: IssueStatus) => start(async () => void (await safe(() => setIssueStatus(id, s))));
   return (
     <>
       {status !== "resolved" && (

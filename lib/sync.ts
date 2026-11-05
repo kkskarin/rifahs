@@ -185,9 +185,9 @@ export async function syncOrderById(legacyId: string | number) {
   return upsertShopifyOrder(o);
 }
 
-/** Time a single sync call may spend. Netlify functions are capped (~26s), so stay under it. */
+/** Time a single sync call may spend before starting another page. Netlify cuts functions off at ~10s by default. */
 export function syncBudgetMs() {
-  return Number(process.env.SYNC_BUDGET_MS ?? 18_000);
+  return Number(process.env.SYNC_BUDGET_MS ?? 6_000);
 }
 
 /**
@@ -211,20 +211,25 @@ export async function syncRecent(budgetMs = syncBudgetMs()) {
   let updated = 0;
   let done = false;
 
+  const save = (value: Record<string, unknown>) =>
+    db.from("sync_state").upsert({ key: "shopify_orders", value, updated_at: new Date().toISOString() });
+
+  // Small pages, several orders in parallel, progress saved after every page — so a run cut
+  // short by the hosting time limit never loses work and the next press carries on.
   while (Date.now() - started < budgetMs) {
-    const page = await fetchOrdersPage({ after: cursor, query, first: 25 });
-    for (const o of page.nodes) {
-      const r = await upsertShopifyOrder(o);
-      r.created ? created++ : updated++;
+    const page = await fetchOrdersPage({ after: cursor, query, first: 15 });
+    for (let i = 0; i < page.nodes.length; i += 5) {
+      const results = await Promise.all(page.nodes.slice(i, i + 5).map((o) => upsertShopifyOrder(o)));
+      for (const r of results) r.created ? created++ : updated++;
     }
     cursor = page.pageInfo.endCursor;
     if (!page.pageInfo.hasNextPage) {
       done = true;
       break;
     }
+    await save({ since, cursor, runStartedAt });
   }
 
-  const value = done ? { since: runStartedAt, cursor: null } : { since, cursor, runStartedAt };
-  await db.from("sync_state").upsert({ key: "shopify_orders", value, updated_at: new Date().toISOString() });
+  await save(done ? { since: runStartedAt, cursor: null } : { since, cursor, runStartedAt });
   return { created, updated, done };
 }

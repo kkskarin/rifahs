@@ -1,5 +1,6 @@
 "use client";
 
+import { safe } from "@/lib/safe";
 import { useState, useTransition } from "react";
 import { updateMember } from "@/app/(ops)/actions";
 import type { Profile, TeamRole } from "@/lib/types";
@@ -9,7 +10,7 @@ export default function MemberControls({ p, canMakeOwner }: { p: Profile; canMak
   const [err, setErr] = useState<string | null>(null);
   const run = (patch: { role?: TeamRole; active?: boolean }) =>
     start(async () => {
-      const r = await updateMember(p.id, patch);
+      const r = (await safe(() => updateMember(p.id, patch))) as { ok: boolean; message?: string };
       setErr(r.ok ? null : (r.message ?? "Failed"));
     });
   if (p.role === "owner" && !canMakeOwner) return null;

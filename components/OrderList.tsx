@@ -1,5 +1,6 @@
 "use client";
 
+import { safe } from "@/lib/safe";
 import Link from "next/link";
 import { useState, useTransition, useActionState } from "react";
 import { advanceOrder, bulkSetStatus, dispatchOrder, type ActionResult } from "@/app/(ops)/actions";
@@ -68,7 +69,7 @@ export default function OrderList({ orders, shopifyReady }: { orders: Order[]; s
             disabled={pending || !selected.size}
             onClick={() =>
               start(async () => {
-                const r = await bulkSetStatus([...selected], bulkTo);
+                const r = (await safe(() => bulkSetStatus([...selected], bulkTo))) as { message?: string };
                 setMsg(r.message ?? null);
                 setSelected(new Set());
               })
@@ -98,6 +99,7 @@ function OrderCard({
 }) {
   const [pending, start] = useTransition();
   const [dispatching, setDispatching] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const next = nextStatus(o.status);
   const due = daysUntil(o.promise_date);
   const open = ["new", "printing", "stitching", "checking", "ready"].includes(o.status);
@@ -144,7 +146,12 @@ function OrderCard({
       {!selecting && (
         <div className="actions">
           {next && next !== "dispatched" && (
-            <button className="advance" disabled={pending} onClick={() => start(() => advanceOrder(o.id).then(() => undefined))}>
+            <button className="advance" disabled={pending} onClick={() =>
+                start(async () => {
+                  const r = (await safe(() => advanceOrder(o.id))) as { ok: boolean; message?: string };
+                  setErr(r.ok ? null : (r.message ?? "Couldn't update"));
+                })
+              }>
               {pending ? "Saving…" : `Mark ${STATUS_LABEL[next]} →`}
             </button>
           )}
@@ -161,6 +168,7 @@ function OrderCard({
           <Link href={`/orders/${o.id}`} className="link">
             Edit
           </Link>
+          {err && <span className="error">{err}</span>}
         </div>
       )}
       {dispatching && <DispatchForm o={o} shopifyReady={shopifyReady} onClose={() => setDispatching(false)} />}
