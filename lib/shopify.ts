@@ -104,7 +104,6 @@ export const ORDER_FIELDS = /* GraphQL */ `
       quantity
       sku
       originalUnitPriceSet { shopMoney { amount } }
-      variant { selectedOptions { name value } }
     }
   }
   fulfillments(first: 5) { createdAt trackingInfo { company number url } }
@@ -148,7 +147,6 @@ export type ShopifyOrder = {
       quantity: number;
       sku: string | null;
       originalUnitPriceSet: { shopMoney: { amount: string } };
-      variant: { selectedOptions: { name: string; value: string }[] } | null;
     }[];
   };
   fulfillments: { createdAt: string; trackingInfo: { company: string | null; number: string | null; url: string | null }[] }[];

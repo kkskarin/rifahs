@@ -3,7 +3,15 @@ import { supabaseAdmin } from "./supabase-server";
 import { fetchOrder, fetchOrdersPage, type ShopifyOrder } from "./shopify";
 import { OPEN_STATUSES, type OrderItem, type OrderStatus } from "./types";
 
-const SIZE_RE = /^(size|sizes)$/i;
+// Sizes as they appear in variant titles, e.g. "M", "XXL", "M / Cotton", "Unstitched", "Free Size".
+const SIZE_TOKEN = /^(\d?X{0,3}[SML]|X{1,4}L|\d{2}|free\s*size|unstitched|custom(\s*size)?|stitched)$/i;
+
+/** Read the size out of a variant title without needing product access (read_products). */
+function sizeFromVariantTitle(title: string | null): string | null {
+  if (!title || title === "Default Title") return null;
+  const parts = title.split("/").map((p) => p.trim()).filter(Boolean);
+  return parts.find((p) => SIZE_TOKEN.test(p)) ?? (parts.length === 1 ? parts[0] : null);
+}
 
 function detectSource(o: ShopifyOrder): string {
   const hay = [
@@ -25,9 +33,7 @@ function detectSource(o: ShopifyOrder): string {
 
 function mapItems(o: ShopifyOrder): OrderItem[] {
   return o.lineItems.nodes.map((li) => {
-    const sizeOpt = li.variant?.selectedOptions.find((opt) => SIZE_RE.test(opt.name));
-    let size = sizeOpt?.value ?? null;
-    if (!size && li.variantTitle && li.variantTitle !== "Default Title") size = li.variantTitle;
+    const size = sizeFromVariantTitle(li.variantTitle);
     return {
       title: li.title,
       size,
