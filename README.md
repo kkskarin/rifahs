@@ -38,8 +38,8 @@ The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remain
 2. Authentication → Email Templates → *Magic Link*: make the email show the code, e.g.
    `Your Rifah's sign-in code is <b>{{ .Token }}</b>` and the link
    `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`.
-3. Authentication → URL Configuration → Site URL `https://ops.rifahs.com`, and add
-   `https://ops.rifahs.com/**` to Redirect URLs.
+3. Authentication → URL Configuration → Site URL = the Netlify address (e.g. `https://rifahs.netlify.app`).
+   Add `https://rifahs.netlify.app/**` (and later `https://ops.rifahs.com/**`) to Redirect URLs.
 4. Recommended: Authentication → SMTP → your own sender (e.g. `ops@rifahs.com` via Zoho/Resend);
    Supabase's built-in mailer only sends a few emails an hour.
 5. Project Settings → API Keys → copy the **secret** key for `SUPABASE_SERVICE_ROLE_KEY`.
@@ -53,9 +53,11 @@ The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remain
 1. Add new site → Import from GitHub → `kkskarin/rifahs`. Build settings come from `netlify.toml`.
 2. Site configuration → Environment variables → add everything from `.env.example`
    (`CRON_SECRET`: any long random string; `BOOTSTRAP_OWNER_EMAIL`: the owner's email).
-3. Domain management → add `ops.rifahs.com`. At your DNS provider add a **CNAME**
-   `ops → <your-site>.netlify.app`. rifahs.com itself stays on Shopify — only `ops` points to Netlify.
-4. Open https://ops.rifahs.com and sign in with the bootstrap email — you become Owner.
+3. Site configuration → change site name to `rifahs` so it lives at https://rifahs.netlify.app.
+   *Later:* Domain management → add `ops.rifahs.com` and a DNS **CNAME** `ops → rifahs.netlify.app`
+   (rifahs.com itself stays on Shopify). The app picks up the new address automatically; just add it
+   to Supabase's Redirect URLs and press **Connect live updates** again.
+4. Open the site and sign in with the bootstrap email — you become Owner.
 5. **Shopify tab → Sync orders now** (press until it says done — first run pulls the full history
    in batches), then **Connect live updates** to register the webhooks.
 6. **Team tab** → add Amma and the team.

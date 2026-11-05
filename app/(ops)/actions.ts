@@ -6,6 +6,7 @@ import { requireAdmin, requireMember } from "@/lib/session";
 import { supabaseAdmin, supabaseServer } from "@/lib/supabase-server";
 import { fulfillInShopify, registerWebhooks, shopifyConfigured } from "@/lib/shopify";
 import { syncBudgetMs, syncRecent } from "@/lib/sync";
+import { siteUrl } from "@/lib/site";
 import { STATUSES, nextStatus, type OrderItem, type OrderStatus, type TeamRole } from "@/lib/types";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -303,7 +304,7 @@ export async function inviteMember(_: ActionResult | null, form: FormData): Prom
     if (error) return { ok: false, message: error.message };
   }
   refreshAll();
-  return { ok: true, message: `${email} can now sign in at ${process.env.NEXT_PUBLIC_SITE_URL ?? "ops.rifahs.com"}` };
+  return { ok: true, message: `${email} can now sign in at ${await siteUrl()}` };
 }
 
 export async function updateMember(id: string, patch: { role?: TeamRole; active?: boolean }): Promise<ActionResult> {
@@ -339,8 +340,8 @@ export async function syncShopifyNow(): Promise<ActionResult> {
 
 export async function connectShopifyWebhooks(): Promise<ActionResult> {
   await requireAdmin();
-  const site = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!site?.startsWith("https://")) return { ok: false, message: "Set NEXT_PUBLIC_SITE_URL to the https address first" };
+  const site = await siteUrl();
+  if (!site.startsWith("https://")) return { ok: false, message: "Live updates need the site's https address — open the app from it and try again" };
   try {
     const r = await registerWebhooks(`${site}/api/shopify/webhooks`);
     return { ok: true, message: r.join(" · ") };

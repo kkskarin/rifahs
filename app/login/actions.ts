@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { supabaseAdmin, supabaseServer } from "@/lib/supabase-server";
+import { siteUrl } from "@/lib/site";
 
 export type LoginState = { step: "email" | "code"; email?: string; error?: string; info?: string };
 
@@ -44,7 +45,7 @@ export async function sendCode(_: LoginState, form: FormData): Promise<LoginStat
     email,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
+      emailRedirectTo: `${await siteUrl()}/auth/callback`,
     },
   });
   if (error) return { step: "email", email, error: error.message };
