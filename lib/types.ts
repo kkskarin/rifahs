@@ -139,3 +139,38 @@ export const EXPENSE_CATEGORIES = [
 ];
 export const SOURCES = ["Shopflo", "Razorpay", "Instagram", "WhatsApp", "Exhibition", "Walk-in", "Manual"];
 export const COURIERS = ["Delhivery", "Shiprocket", "DTDC", "Blue Dart", "India Post", "DHL", "FedEx", "Aramex", "Other"];
+
+export type StitchedRow = { size: string; qty: number };
+export type Product = {
+  id: string;
+  name: string;
+  aliases: string[];
+  category: string;
+  collection: string;
+  in_stock: number;
+  at_stitching: number;
+  in_production: number;
+  low_at: number;
+  active: boolean;
+  notes: string;
+  updated_at: string;
+  stitched: StitchedRow[];
+};
+export type StockField = "in_stock" | "at_stitching" | "in_production" | "stitched";
+export type StockMove = {
+  id: number;
+  product_id: string;
+  field: StockField;
+  size: string | null;
+  delta: number;
+  reason: string;
+  order_id: string | null;
+  actor: string | null;
+  created_at: string;
+};
+export const STOCK_LABEL: Record<StockField, string> = {
+  in_stock: "Fabric in stock",
+  at_stitching: "At stitching unit",
+  in_production: "In production",
+  stitched: "Ready stitched",
+};

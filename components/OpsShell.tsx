@@ -28,6 +28,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     { href: "/orders", label: "Orders", n: all },
     { href: "/express", label: "Express", n: s.expressDue, hot: s.expressDue > 0 },
     { href: "/international", label: "International", n: s.international },
+    { href: "/inventory", label: "Inventory" },
     { href: "/issues", label: "Issues", n: openIssues, hot: openIssues > 0 },
     ...(admin
       ? [
