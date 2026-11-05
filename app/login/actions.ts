@@ -12,6 +12,9 @@ export async function sendCode(_: LoginState, form: FormData): Promise<LoginStat
   const email = norm(form.get("email"));
   if (!/^\S+@\S+\.\S+$/.test(email)) return { step: "email", error: "Enter a valid email address." };
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { step: "email", error: "Setup isn't finished: SUPABASE_SERVICE_ROLE_KEY is missing on Netlify." };
+  }
   const admin = supabaseAdmin();
   const { count } = await admin.from("profiles").select("id", { count: "exact", head: true });
 
