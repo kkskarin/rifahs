@@ -45,14 +45,24 @@ export function cleanName(raw: string | null | undefined): string {
   return words.join(" ");
 }
 
+/** Customers whose orders are internal / test orders (kept out of sales and lists). */
+const INTERNAL_EMAILS = (
+  process.env.INTERNAL_CUSTOMER_EMAILS ?? "jashimraswi@gmail.com,nilofarthahir@gmail.com,a.thanisharin@gmail.com"
+)
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 function mapItems(o: ShopifyOrder): OrderItem[] {
-  return o.lineItems.nodes.map((li) => {
+  // Skip pieces removed by an order edit or refund (currentQuantity 0).
+  const lines = o.lineItems.nodes.filter((li) => (li.currentQuantity ?? li.quantity) > 0);
+  return (lines.length ? lines : o.lineItems.nodes).map((li) => {
     const size = sizeFromVariantTitle(li.variantTitle);
     return {
       title: li.title,
       size,
       variant: li.variantTitle && li.variantTitle !== "Default Title" ? li.variantTitle : null,
-      quantity: li.quantity,
+      quantity: li.currentQuantity || li.quantity,
       price: Number(li.originalUnitPriceSet.shopMoney.amount),
       sku: li.sku,
     };
@@ -102,11 +112,18 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
     placed_at: o.createdAt,
   };
 
-  const { data: existing } = await db
-    .from("orders")
-    .select("id, status, is_express, notes, courier, tracking_number, dispatched_at")
-    .eq("shopify_id", shopifyId)
-    .maybeSingle();
+  const cols = "id, status, is_express, notes, courier, tracking_number, dispatched_at";
+  let { data: existing } = await db.from("orders").select(cols).eq("shopify_id", shopifyId).maybeSingle();
+  if (!existing) {
+    // An entry imported earlier (order sheet / Shopify export) without a Shopify id: adopt it, don't duplicate.
+    const { data: byNumber } = await db
+      .from("orders")
+      .select(cols)
+      .eq("order_number", o.name)
+      .is("shopify_id", null)
+      .maybeSingle();
+    existing = byNumber;
+  }
 
   const implied = shopifyStatus(o);
 
@@ -118,6 +135,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
       .from("orders")
       .insert({
         ...shopifyOwned,
+        is_internal: INTERNAL_EMAILS.includes((o.email ?? "").toLowerCase()),
         status: implied ?? "new",
         is_express: isExpress(o),
         notes,

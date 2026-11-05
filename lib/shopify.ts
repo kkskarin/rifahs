@@ -93,6 +93,7 @@ export const ORDER_FIELDS = /* GraphQL */ `
       title
       variantTitle
       quantity
+      currentQuantity
       sku
       originalUnitPriceSet { shopMoney { amount } }
     }
@@ -136,6 +137,7 @@ export type ShopifyOrder = {
       title: string;
       variantTitle: string | null;
       quantity: number;
+      currentQuantity: number;
       sku: string | null;
       originalUnitPriceSet: { shopMoney: { amount: string } };
     }[];

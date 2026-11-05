@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const f = req.nextUrl.searchParams.get("f") ?? "all";
   const q = req.nextUrl.searchParams.get("q") ?? undefined;
   const statuses = f === "open" ? OPEN_STATUSES : STATUSES.includes(f as OrderStatus) ? [f as OrderStatus] : undefined;
-  const orders = await listOrders({ statuses, q, limit: 10_000 });
+  const orders = await listOrders({ statuses, q, limit: 10_000, internalOnly: f === "internal" });
 
   const cols = [
     "Order #", "Placed", "Customer", "Phone", "Email", "Items", "Amount", "Status", "Express", "Promise date",

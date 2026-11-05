@@ -34,12 +34,19 @@ export const getIntlOpenCount = cache(async () => {
     .from("orders")
     .select("id", { count: "exact", head: true })
     .eq("is_international", true)
+    .eq("is_internal", false)
     .in("status", ["new", "printing", "stitching", "checking", "ready"]);
   return count ?? 0;
 });
 
 const ORDER_COLS =
-  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, ship_country, ship_city, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
+  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, ship_country, ship_city, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
+
+export const getInternalCount = cache(async () => {
+  const db = await supabaseServer();
+  const { count } = await db.from("orders").select("id", { count: "exact", head: true }).eq("is_internal", true);
+  return count ?? 0;
+});
 
 export async function listOrders(opts: {
   statuses?: OrderStatus[];
@@ -47,6 +54,8 @@ export async function listOrders(opts: {
   express?: boolean;
   international?: boolean;
   orderBy?: "placed_at" | "promise_date";
+  includeInternal?: boolean;
+  internalOnly?: boolean;
   limit?: number;
 }) {
   const db = await supabaseServer();
@@ -54,6 +63,8 @@ export async function listOrders(opts: {
   if (opts.statuses?.length) query = query.in("status", opts.statuses);
   if (opts.express) query = query.eq("is_express", true);
   if (opts.international) query = query.eq("is_international", true);
+  if (opts.internalOnly) query = query.eq("is_internal", true);
+  else if (!opts.includeInternal) query = query.eq("is_internal", false);
   if (opts.q) {
     const q = opts.q.replace(/[%,()]/g, " ").trim();
     const num = q.replace(/^#/, "");

@@ -70,6 +70,7 @@ export type Order = {
   is_express: boolean;
   promise_date: string | null;
   is_international: boolean;
+  is_internal: boolean;
   ship_country: string | null;
   ship_city: string | null;
   ship_address: Record<string, unknown> | null;

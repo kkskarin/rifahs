@@ -117,6 +117,9 @@ export default function OrderForm({ order }: { order?: Order }) {
           <label className="checkbox">
             <input type="checkbox" name="is_international" defaultChecked={order?.is_international} /> International
           </label>
+          <label className="checkbox" title="Staff / test orders: hidden from the order list and left out of sales">
+            <input type="checkbox" name="is_internal" defaultChecked={order?.is_internal} /> Internal / test order
+          </label>
         </div>
 
         <label className="field full">

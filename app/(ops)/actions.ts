@@ -127,6 +127,7 @@ export async function saveOrder(_: ActionResult | null, form: FormData): Promise
     is_express: bool(form, "is_express"),
     promise_date: optStr(form, "promise_date"),
     is_international: bool(form, "is_international"),
+    is_internal: bool(form, "is_internal"),
     ship_country: optStr(form, "ship_country"),
     courier: optStr(form, "courier"),
     tracking_number: optStr(form, "tracking_number"),

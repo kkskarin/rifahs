@@ -46,6 +46,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="row2">
             <span className={`pill ${o.status}`}>{STATUS_LABEL[o.status]}</span>
+            {o.is_internal && <span className="flag late">Internal / test — not counted</span>}
             <span className="items">{itemsLine(o.items)}</span>
             {o.source && <span className="meta">{o.source}</span>}
             <span className="meta">Placed {dateTime(o.placed_at)}</span>
