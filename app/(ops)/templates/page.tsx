@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
-import { sendTestEmail } from "../../auth-actions";
+import { emailSetup, sendTestEmail } from "../../auth-actions";
 import { fill, renderEmail, SAMPLE_VARS, TEMPLATE_VARIABLES, type EmailTemplate } from "@/lib/email-render";
 import { dateTime } from "@/lib/format";
 import { isAdmin } from "@/lib/roles";
@@ -20,6 +20,7 @@ export default function TemplatesPage() {
     if (error) throw error;
     return (data ?? []) as Row[];
   });
+  const { data: setup } = useSWR(admin ? "email-setup" : null, () => emailSetup());
   const [key, setKey] = useState("invite");
   const [draft, setDraft] = useState<EmailTemplate | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -51,6 +52,7 @@ export default function TemplatesPage() {
         <p>The emails Kaleidoscope Core sends from no-reply@rifahs.com. Edit the words here; the design stays on-brand.</p>
       </div>
 
+      {setup && <p className={setup.ready ? "success" : "error"} style={{ marginTop: -8 }}>{setup.text}</p>}
       <nav className="chips">
         {templates.map((t) => (
           <button key={t.key} className="chip" aria-current={t.key === key ? "true" : undefined} onClick={() => setKey(t.key)}>

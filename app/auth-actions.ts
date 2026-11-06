@@ -168,3 +168,13 @@ export async function sendTestEmail(t: EmailTemplate): Promise<Result> {
   const r = await sendMail(me.email, { ...msg, subject: `[Test] ${msg.subject}` });
   return { ok: r.sent, message: r.status };
 }
+
+/** Templates page: is email sending connected, and as whom? (No secrets returned.) */
+export async function emailSetup() {
+  await requireAdmin();
+  const from = process.env.EMAIL_FROM || "Kaleidoscope by Rifah <no-reply@rifahs.com>";
+  if (process.env.SMTP_USER && process.env.SMTP_PASS)
+    return { ready: true, text: `Sending as ${from} through ${process.env.SMTP_USER} (Google Workspace).` };
+  if (process.env.RESEND_API_KEY) return { ready: true, text: `Sending as ${from} through Resend.` };
+  return { ready: false, text: "Email sending isn't connected yet — links can still be copied from the Team page." };
+}
