@@ -64,6 +64,10 @@ The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remain
 
 The 10-minute read-only sync is `netlify/functions/shopify-sync.mjs` (a Netlify scheduled function).
 
+## Deploying (saves Netlify credits)
+- Day-to-day changes go to the `preview` branch → free branch deploy at https://preview--rifahs.netlify.app.
+- Production (`main`) is only updated when we decide to go live, batching many changes into one deploy.
+
 ## Local development
 ```bash
 cp .env.example .env.local   # fill in
