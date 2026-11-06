@@ -64,6 +64,11 @@ The schema in `supabase/migrations/0001_init.sql` is **already applied**. Remain
 
 The 10-minute read-only sync is `netlify/functions/shopify-sync.mjs` (a Netlify scheduled function).
 
+## Email
+Invite and password emails are sent from **no-reply@rifahs.com** through the Google Workspace mailbox
+operations@rifahs.com (SMTP + app password; see `.env.example`). Wording is edited in the app under
+☰ → Email templates.
+
 ## Deploying (saves Netlify credits)
 - Day-to-day changes go to the `preview` branch → free branch deploy at https://preview--rifahs.netlify.app.
 - Production (`main`) is only updated when we decide to go live, batching many changes into one deploy.
