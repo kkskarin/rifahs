@@ -39,8 +39,15 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       : []),
   ];
 
+  const isPreview = typeof window !== "undefined" && window.location.hostname.startsWith("preview--");
+
   return (
     <div className="wrap">
+      {isPreview && (
+        <div className="preview-banner">
+          Preview version — not live yet. Orders and stock you change here are real (same data as the live app).
+        </div>
+      )}
       <header className="topbar">
         <Link href="/orders" className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
