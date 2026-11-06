@@ -63,13 +63,13 @@ export async function sendCode(_: LoginState, form: FormData): Promise<LoginStat
 export async function verifyCode(_: LoginState, form: FormData): Promise<LoginState> {
   const email = norm(form.get("email"));
   const token = String(form.get("code") ?? "").replace(/\s/g, "");
-  const next = String(form.get("next") ?? "/orders");
+  const next = String(form.get("next") ?? "/");
   if (!/^\d{6,10}$/.test(token)) return { step: "code", email, error: "Enter the code from the email." };
 
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
   if (error) return { step: "code", email, error: "That code didn't work — check it or send a new one." };
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/orders");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
 }
 
 export async function signOut() {

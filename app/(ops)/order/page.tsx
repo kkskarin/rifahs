@@ -1,5 +1,6 @@
 "use client";
 
+import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -38,6 +39,7 @@ export default function OrderPage() {
 
   return (
     <>
+      <SalesNav />
       <p style={{ marginTop: 0 }}>
         <Link href="/orders" className="link">
           ← Back to orders

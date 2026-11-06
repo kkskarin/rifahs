@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import LoginForm from "./LoginForm";
+import PasswordLogin from "./PasswordLogin";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 const ERRORS: Record<string, string> = {
-  "no-access": "Your account isn't active on the team. Ask an admin to add you.",
-  link: "That sign-in link has expired. Request a new code below.",
+  "no-access": "Your account isn't active on the team. Ask an owner to add you.",
+  link: "That sign-in link has expired. Sign in below or ask for a new one.",
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
@@ -16,10 +16,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="logo" src="/logo.png" alt="Kaleidoscope by Rifah" />
         <h1>
-          The <em>order book</em>
+          Kaleidoscope <em>Core</em>
         </h1>
-        <p>For the Rifah&apos;s team. Sign in with your email.</p>
-        <LoginForm next={sp.next ?? "/orders"} error={sp.error ? ERRORS[sp.error] : undefined} />
+        <p>For Rifah&apos;s team. Sign in to continue.</p>
+        <PasswordLogin next={sp.next ?? "/"} error={sp.error ? ERRORS[sp.error] : undefined} />
       </div>
     </main>
   );

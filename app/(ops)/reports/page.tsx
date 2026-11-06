@@ -9,7 +9,7 @@ import { EXPENSE_CATEGORIES } from "@/lib/types";
 const monthKey = (iso: string) =>
   new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0, 7); // YYYY-MM in IST
 
-export default function MoneyPage() {
+export default function ReportsPage() {
   const { data: me } = useMe();
   const admin = me ? isAdmin(me) : false;
   const { data: orders } = useOrders();
@@ -35,10 +35,14 @@ export default function MoneyPage() {
     return { months: [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])), byCat: [...cat.entries()].sort((a, b) => b[1] - a[1]) };
   }, [orders, expenses]);
 
-  if (me && !admin) return <p className="empty">Money is visible to owners and admins.</p>;
+  if (me && !admin) return <p className="empty">Reports are visible to owners and admins.</p>;
 
   return (
     <>
+      <div className="page-head">
+        <h1>Reports</h1>
+        <p>Sales, spending and approximate profit by month.</p>
+      </div>
       <form
         ref={formRef}
         className="panel"

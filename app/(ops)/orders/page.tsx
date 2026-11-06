@@ -1,5 +1,6 @@
 "use client";
 
+import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
@@ -38,6 +39,7 @@ export default function OrdersPage() {
 
   return (
     <>
+      <SalesNav />
       <div className="toolbar">
         <SearchBox />
         <button className="btn ghost" onClick={() => downloadOrdersCsv(list, f)} disabled={!all}>

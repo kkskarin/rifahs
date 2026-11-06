@@ -1,5 +1,6 @@
 "use client";
 
+import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useState } from "react";
 import { dateTime } from "@/lib/format";
@@ -19,6 +20,7 @@ export default function IssuesPage() {
 
   return (
     <>
+      <SalesNav />
       {!adding ? (
         <div className="toolbar">
           <button className="btn" onClick={() => setAdding(true)}>

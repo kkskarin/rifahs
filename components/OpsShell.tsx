@@ -1,118 +1,108 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect } from "react";
-import { money } from "@/lib/format";
-import { signOutEverywhere, summarize, useExpenses, useIssues, useMe, useOrders } from "@/lib/store";
+import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { isAdmin } from "@/lib/roles";
-import Tabs from "./Tabs";
+import { signOutEverywhere, useMe } from "@/lib/store";
+
+export const APP_NAME = "Kaleidoscope · Core";
+
+type Header = { label: string; href: string; match: string[]; adminOnly?: boolean };
+export const HEADERS: Header[] = [
+  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/issues", "/order"] },
+  { label: "Purchase", href: "/purchase", match: ["/purchase"] },
+  { label: "Inventory", href: "/inventory", match: ["/inventory"] },
+  { label: "Masters", href: "/masters", match: ["/masters"] },
+  { label: "Reports", href: "/reports", match: ["/reports"], adminOnly: true },
+];
+
+const SETTINGS: { label: string; href: string; adminOnly?: boolean; ownerOnly?: boolean }[] = [
+  { label: "Team", href: "/team", adminOnly: true },
+  { label: "Email templates", href: "/templates", adminOnly: true },
+  { label: "Shopify", href: "/settings", adminOnly: true },
+];
+
 
 export default function OpsShell({ children }: { children: React.ReactNode }) {
-  const { data: me, isLoading: meLoading } = useMe();
+  const path = usePathname();
+  const { data: me, isLoading } = useMe();
   const admin = me ? isAdmin(me) : false;
-  const { data: orders } = useOrders();
-  const { data: expenses } = useExpenses(admin);
-  const { data: issues } = useIssues();
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!meLoading && me === null) window.location.href = "/login?error=no-access";
-    if (me && !me.active) window.location.href = "/login?error=no-access";
-  }, [me, meLoading]);
+    if (!isLoading && (me === null || (me && !me.active))) window.location.href = "/login?error=no-access";
+  }, [me, isLoading]);
 
-  const s = summarize(orders, expenses);
-  const openIssues = (issues ?? []).filter((i) => i.status !== "resolved").length;
-  const all = (orders ?? []).filter((o) => !o.is_internal).length;
-  const dash = (v: string | number) => (orders ? v : "…");
+  useEffect(() => {
+    setMenu(false);
+    // keep the active header visible when the header row scrolls sideways
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [path]);
 
-  const tabs = [
-    { href: "/orders", label: "Orders", n: all },
-    { href: "/express", label: "Express", n: s.expressDue, hot: s.expressDue > 0 },
-    { href: "/international", label: "International", n: s.international },
-    { href: "/inventory", label: "Inventory" },
-    { href: "/issues", label: "Issues", n: openIssues, hot: openIssues > 0 },
-    ...(admin
-      ? [
-          { href: "/money", label: "Money" },
-          { href: "/team", label: "Team" },
-          { href: "/settings", label: "Shopify" },
-        ]
-      : []),
-  ];
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => !menuRef.current?.contains(e.target as Node) && setMenu(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menu]);
 
   const isPreview = typeof window !== "undefined" && window.location.hostname.startsWith("preview--");
+  const headers = HEADERS.filter((h) => !h.adminOnly || admin);
 
   return (
-    <div className="wrap">
-      {isPreview && (
-        <div className="preview-banner">
-          Preview version — not live yet. Orders and stock you change here are real (same data as the live app).
-        </div>
-      )}
-      <header className="topbar">
-        <Link href="/orders" className="brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Kaleidoscope by Rifah" />
-          <small>Order book</small>
-        </Link>
-        <div className="who">
-          <span>{me ? me.full_name || me.email : ""}</span>
-          <button className="link" onClick={signOutEverywhere}>
-            Sign out
-          </button>
+    <>
+      <header className="appbar">
+        {isPreview && <div className="preview-banner">Preview version — not live yet. Orders and stock you change here are real.</div>}
+        <div className="appbar-row">
+          <Link href="/" className="brand" aria-label={`${APP_NAME} home`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Kaleidoscope by Rifah" />
+          </Link>
+          <nav className="headers" ref={navRef} aria-label="Sections">
+            {headers.map((h) => (
+              <Link key={h.href} href={h.href} className="header-link" aria-current={h.match.some((m) => path === m || path.startsWith(m + "/")) ? "page" : undefined}>
+                {h.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="settings" ref={menuRef}>
+            <button className="settings-btn" aria-label="Settings" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+              <span />
+              <span />
+              <span />
+            </button>
+            {menu && (
+              <div className="settings-menu" role="menu">
+                <div className="who-block">
+                  <b>{me?.full_name || "—"}</b>
+                  <span>{me?.email}</span>
+                  {me && <small>{me.role[0].toUpperCase() + me.role.slice(1)}</small>}
+                </div>
+                {SETTINGS.filter((s) => !s.adminOnly || admin).map((s) => (
+                  <Link key={s.href} href={s.href} role="menuitem" aria-current={path === s.href ? "page" : undefined}>
+                    {s.label}
+                  </Link>
+                ))}
+                <button role="menuitem" onClick={signOutEverywhere}>
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      <section className="hero">
-        <h1>
-          Every order, <em>one place.</em>
-        </h1>
-        <p>Orders, express promises, international parcels, courier issues and money — kept for you and Amma.</p>
-      </section>
-
-      <section className="stats" aria-label="Summary">
-        {admin ? (
-          <>
-            <div className="stat">
-              <div className="label">Sales</div>
-              <div className="value">{dash(money(s.sales))}</div>
-            </div>
-            <div className="stat">
-              <div className="label">Spent</div>
-              <div className="value">{expenses ? money(s.spent) : "…"}</div>
-            </div>
-            <div className="stat">
-              <div className="label">Approx. profit</div>
-              <div className="value">{expenses && orders ? money(s.profit) : "…"}</div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="stat">
-              <div className="label">Express due</div>
-              <div className="value">{dash(s.expressDue)}</div>
-            </div>
-            <div className="stat">
-              <div className="label">International</div>
-              <div className="value">{dash(s.international)}</div>
-            </div>
-            <div className="stat">
-              <div className="label">Open issues</div>
-              <div className="value">{issues ? openIssues : "…"}</div>
-            </div>
-          </>
-        )}
-        <div className="stat">
-          <div className="label">Not dispatched</div>
-          <div className="value accent">{dash(s.notDispatched)}</div>
-        </div>
-      </section>
-
-      <Tabs tabs={tabs} />
-      <Suspense fallback={<p className="empty">Loading…</p>}>{me ? children : <p className="empty">Loading…</p>}</Suspense>
-
-      <Link href="/orders/new" className="btn primary fab">
-        + Add entry
-      </Link>
-    </div>
+      <main className="page">
+        <Suspense fallback={<p className="empty">Loading…</p>}>{me ? children : <p className="empty">Loading…</p>}</Suspense>
+      </main>
+    </>
   );
 }

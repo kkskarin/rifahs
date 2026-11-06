@@ -6,8 +6,8 @@ const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], var
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Order Book · Rifah's", template: "%s · Rifah's Ops" },
-  description: "Orders, express promises, international parcels, courier issues and money — for the Rifah's team.",
+  title: { default: "Kaleidoscope · Core", template: "%s · Kaleidoscope · Core" },
+  description: "Orders, inventory and money for Kaleidoscope by Rifah — for Rifah's team.",
   robots: { index: false, follow: false },
 };
 

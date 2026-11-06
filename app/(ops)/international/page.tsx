@@ -1,5 +1,6 @@
 "use client";
 
+import SalesNav from "@/components/SalesNav";
 import { useMemo, useState } from "react";
 import OrderList from "@/components/OrderList";
 import { isOpen, useOrders } from "@/lib/store";
@@ -13,6 +14,7 @@ export default function InternationalPage() {
   );
   return (
     <>
+      <SalesNav />
       <nav className="chips">
         <button className="chip" aria-current={!all ? "true" : undefined} onClick={() => setAll(false)}>
           <b>In progress</b>

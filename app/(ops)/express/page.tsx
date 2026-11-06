@@ -1,5 +1,6 @@
 "use client";
 
+import SalesNav from "@/components/SalesNav";
 import { useMemo } from "react";
 import OrderList from "@/components/OrderList";
 import { isOpen, useOrders } from "@/lib/store";
@@ -15,6 +16,7 @@ export default function ExpressPage() {
   );
   return (
     <>
+      <SalesNav />
       <p className="hint" style={{ marginTop: 0 }}>
         Express orders still to ship, soonest promise first. Set the promise date on each order so nothing slips.
       </p>
