@@ -390,3 +390,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .name-edit { border: 1px solid transparent; background: transparent; padding: 4px 6px; margin-left: -6px; border-radius: 4px; min-width: 9ch; }
 .name-edit:hover { border-color: var(--line-strong); }
 .name-edit:focus { border-color: var(--wine); background: #fffdf5; outline: 0; }
+
+@media (max-width: 640px) {
+  .appbar .brand img { height: 38px; width: 38px; object-fit: contain; }
+}

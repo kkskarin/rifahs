@@ -39,7 +39,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMenu(false);
     // keep the active header visible when the header row scrolls sideways
-    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [path]);
 
   useEffect(() => {
@@ -63,8 +63,12 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
         {isPreview && <div className="preview-banner">Preview version — not live yet. Orders and stock you change here are real.</div>}
         <div className="appbar-row">
           <Link href="/" className="brand" aria-label={`${APP_NAME} home`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Kaleidoscope by Rifah" />
+            {/* Phones: just the kaleidoscope mark. Tablets and up: the full logo. */}
+            <picture>
+              <source media="(max-width: 640px)" srcSet="/mark.png" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="Kaleidoscope by Rifah" />
+            </picture>
           </Link>
           <nav className="headers" ref={navRef} aria-label="Sections">
             {headers.map((h) => (
