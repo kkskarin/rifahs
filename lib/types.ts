@@ -121,7 +121,11 @@ export type Expense = {
   paid_to: string;
   note: string;
   created_at: string;
+  category_id: string | null;
+  vendor_id: string | null;
 };
+export type ExpenseCategory = { id: string; name: string; parent_id: string | null; sort: number };
+export type Vendor = { id: string; name: string; phone: string; notes: string };
 
 export const ISSUE_KINDS = ["Courier", "Delayed", "Damaged", "Wrong item", "Return", "Exchange", "Payment", "Other"];
 export const EXPENSE_CATEGORIES = [

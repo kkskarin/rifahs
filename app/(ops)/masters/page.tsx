@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { CategoryMaster, VendorMaster } from "@/components/MoneyMasters";
 import { mutate } from "swr";
 import ProductForm from "@/components/ProductForm";
 import { useProducts } from "@/lib/inventory";
@@ -28,13 +31,34 @@ export default function MastersPage() {
     mutate("products");
   };
 
-  return (
+  const tab = useSearchParams().get("m") ?? "designs";
+  const admin = me ? isAdmin(me) : false;
+  const TABS = [
+    { key: "designs", label: "Designs" },
+    ...(admin ? [{ key: "categories", label: "Expense categories" }] : []),
+    { key: "vendors", label: "Vendors" },
+  ];
+  const head = (
     <>
       <div className="page-head">
         <h1>Masters</h1>
-        <p>The master list of designs. Other spellings let orders from Shopify and the sheets match the right design.</p>
+        <p>The lists everything else picks from: designs, expense categories and vendors.</p>
       </div>
+      <nav className="tabs" aria-label="Masters">
+        {TABS.map((t) => (
+          <Link key={t.key} href={`/masters?m=${t.key}`} className="tab" aria-current={tab === t.key ? "page" : undefined} replace scroll={false}>
+            {t.label}
+          </Link>
+        ))}
+      </nav>
+    </>
+  );
+  if (tab === "categories" && admin) return <>{head}<CategoryMaster canEdit={admin} /></>;
+  if (tab === "vendors") return <>{head}<VendorMaster canEdit={admin} /></>;
 
+  return (
+    <>
+      {head}
       <div className="toolbar">
         <label className="search">
           <span className="sr-only">Search designs</span>

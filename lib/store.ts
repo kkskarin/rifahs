@@ -358,25 +358,6 @@ export async function setIssueStatus(id: string, status: IssueStatus): Promise<R
   return error ? { ok: false, message: error.message } : { ok: true };
 }
 
-export async function addExpense(
-  me: Profile,
-  input: { amount: string; category: string; spent_on: string; paid_to: string; note: string },
-): Promise<Result> {
-  const amount = Number(input.amount.replace(/[₹,\s]/g, ""));
-  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Enter an amount" };
-  const { error } = await sb().from("expenses").insert({
-    amount,
-    category: input.category || "Other",
-    spent_on: input.spent_on || undefined,
-    paid_to: input.paid_to,
-    note: input.note,
-    created_by: me.id,
-  });
-  if (error) return { ok: false, message: error.message };
-  mutate("expenses");
-  return { ok: true, message: "Expense added" };
-}
-
 export async function deleteExpense(id: string): Promise<Result> {
   mutate<Expense[]>("expenses", (l) => (l ?? []).filter((e) => e.id !== id), { revalidate: false });
   const { error } = await sb().from("expenses").delete().eq("id", id);
