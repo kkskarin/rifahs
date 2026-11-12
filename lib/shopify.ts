@@ -1,6 +1,7 @@
 import "server-only";
 
-// READ-ONLY by design: this app never writes to Shopify (no mutations).
+// Reads orders from Shopify. The ONLY write is createShopifyOrder(): a manual entry made in Core
+// is created as an order in Shopify, at the user's request. Nothing else is ever changed there.
 
 const SHOP = process.env.SHOPIFY_STORE_DOMAIN ?? "xd1uww-uu.myshopify.com";
 const VERSION = process.env.SHOPIFY_API_VERSION ?? "2026-10";
@@ -166,4 +167,105 @@ export async function fetchOrdersPage(opts: { after?: string | null; query?: str
     { first: opts.first ?? 50, after: opts.after ?? null, query: opts.query ?? null },
   );
   return data.orders;
+}
+
+// ── The one write: create a manual order ───────────────────────
+export type NewShopifyOrder = {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: { address1?: string | null; city?: string | null; province?: string | null; zip?: string | null; country?: string | null } | null;
+  items: { title: string; size: string | null; quantity: number; price: number }[];
+  paid: boolean;
+  note: string;
+  tags: string[];
+};
+
+// Shopify wants Indian states as codes.
+const IN_STATES: Record<string, string> = Object.fromEntries(
+  (
+    "andhra pradesh:AP,arunachal pradesh:AR,assam:AS,bihar:BR,chhattisgarh:CG,goa:GA,gujarat:GJ,haryana:HR,himachal pradesh:HP," +
+    "jharkhand:JH,karnataka:KA,kerala:KL,madhya pradesh:MP,maharashtra:MH,manipur:MN,meghalaya:ML,mizoram:MZ,nagaland:NL,odisha:OR,orissa:OR," +
+    "punjab:PB,rajasthan:RJ,sikkim:SK,tamil nadu:TN,tamilnadu:TN,telangana:TS,tripura:TR,uttar pradesh:UP,uttarakhand:UK,west bengal:WB," +
+    "delhi:DL,new delhi:DL,jammu and kashmir:JK,ladakh:LA,chandigarh:CH,puducherry:PY,pondicherry:PY,andaman and nicobar islands:AN," +
+    "dadra and nagar haveli and daman and diu:DN,lakshadweep:LD"
+  )
+    .split(",")
+    .map((x) => x.split(":") as [string, string]),
+);
+
+const normSize = (s: string | null | undefined) => (s ?? "").trim().toUpperCase().replace("2XL", "XXL");
+
+/** Find the Shopify variant for "Design" + size so stock and reports stay right. Needs read_products; null if unavailable. */
+async function findVariant(title: string, size: string | null): Promise<string | null> {
+  try {
+    const data = await shopifyGraphQL<{
+      products: { nodes: { title: string; variants: { nodes: { id: string; title: string }[] } }[] };
+    }>(
+      `query($q: String!) { products(first: 5, query: $q) { nodes { title variants(first: 50) { nodes { id title } } } } }`,
+      { q: `title:"${title.replace(/"/g, "")}"` },
+    );
+    const product = data.products.nodes.find((p) => p.title.trim().toLowerCase() === title.trim().toLowerCase());
+    if (!product) return null;
+    const vs = product.variants.nodes;
+    if (!size) return vs.length === 1 ? vs[0].id : null;
+    return vs.find((v) => v.title.split("/").some((part) => normSize(part) === normSize(size)))?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createShopifyOrder(o: NewShopifyOrder) {
+  const [first, ...rest] = o.name.trim().split(/\s+/);
+  const last = rest.join(" ") || first;
+  const lineItems = [];
+  let matched = 0;
+  for (const it of o.items) {
+    const variantId = await findVariant(it.title, it.size);
+    if (variantId) matched++;
+    lineItems.push({
+      ...(variantId ? { variantId } : { title: it.title, ...(it.size ? { variantTitle: it.size } : {}), requiresShipping: true }),
+      quantity: it.quantity,
+      priceSet: { shopMoney: { amount: it.price.toFixed(2), currencyCode: "INR" } },
+    });
+  }
+  const a = o.address;
+  const hasAddress = Boolean(a?.address1 && a?.city);
+  const india = !a?.country || /^(india|in|bharat)$/i.test(a.country.trim());
+  const stateCode = IN_STATES[(a?.province ?? "").trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
+  const order: Record<string, unknown> = {
+    currency: "INR",
+    lineItems,
+    financialStatus: o.paid ? "PAID" : "PENDING",
+    note: o.note || undefined,
+    tags: o.tags,
+    ...(o.email ? { email: o.email } : {}),
+    ...(o.phone ? { phone: o.phone } : {}),
+    ...(hasAddress
+      ? {
+          shippingAddress: {
+            firstName: first,
+            lastName: last,
+            address1: a!.address1,
+            city: a!.city,
+            ...(india ? { countryCode: "IN" } : { country: a!.country }),
+            ...(india && stateCode ? { provinceCode: stateCode } : a!.province ? { address2: a!.province } : {}),
+            zip: a!.zip || undefined,
+            phone: o.phone || undefined,
+          },
+        }
+      : {}),
+  };
+  const data = await shopifyGraphQL<{
+    orderCreate: { userErrors: { field: string[] | null; message: string }[]; order: { legacyResourceId: string; name: string } | null };
+  }>(
+    `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
+      orderCreate(order: $order, options: $options) { userErrors { field message } order { legacyResourceId name } }
+    }`,
+    // No emails to the customer; stock is only reduced for items matched to a real variant.
+    { order, options: { sendReceipt: false, sendFulfillmentReceipt: false, inventoryBehaviour: matched ? "DECREMENT_IGNORING_POLICY" : "BYPASS" } },
+  );
+  const errs = data.orderCreate.userErrors;
+  if (errs.length || !data.orderCreate.order) throw new Error(errs.map((e) => e.message).join("; ") || "Shopify did not create the order");
+  return { id: Number(data.orderCreate.order.legacyResourceId), name: data.orderCreate.order.name, matched, total: o.items.length };
 }

@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { mutate } from "swr";
+import { pushOrderToShopify } from "@/app/(ops)/actions";
+import { safe } from "@/lib/safe";
 import { itemsLine } from "@/lib/format";
 import { saveOrder, useMe } from "@/lib/store";
 import { COURIERS, SOURCES, STATUSES, STATUS_LABEL, type Order, type OrderStatus } from "@/lib/types";
@@ -10,7 +14,7 @@ export default function OrderForm({ order }: { order?: Order }) {
   const router = useRouter();
   const { data: me } = useMe();
   const [busy, setBusy] = useState(false);
-  const [state, setState] = useState<{ ok: boolean; message?: string } | null>(null);
+  const [state, setState] = useState<{ ok: boolean; message?: string; id?: string } | null>(null);
   const fromShopify = Boolean(order?.shopify_id);
   const sizes = new Set(order?.items.map((i) => i.size).filter(Boolean));
   const commonSize = sizes.size === 1 ? [...sizes][0]! : "";
@@ -46,10 +50,25 @@ export default function OrderForm({ order }: { order?: Order }) {
           source: n("source"),
           channel: v("channel"),
           order_number: n("order_number"),
+          address1: n("address1"),
+          city: n("city"),
+          province: n("province"),
+          zip: n("zip"),
+          payment: v("payment") === "pending" ? "pending" : "paid",
         });
+        if (r.ok && !order && r.id) {
+          if (b("to_shopify") && !b("is_internal")) {
+            // The one thing Core writes to Shopify: this new entry, as a real order.
+            const s = (await safe(() => pushOrderToShopify(r.id!))) as { ok: boolean; message?: string };
+            await mutate("orders");
+            setBusy(false);
+            if (!s.ok) return setState({ ok: false, message: s.message, id: r.id });
+          }
+          setBusy(false);
+          return router.replace(`/order?id=${r.id}`);
+        }
         setBusy(false);
         setState(r);
-        if (r.ok && !order && r.id) router.replace(`/order?id=${r.id}`);
       }}
     >
       <h2>{order ? "Order details" : "Add an entry"}</h2>
@@ -104,7 +123,7 @@ export default function OrderForm({ order }: { order?: Order }) {
             </label>
             <label className="field">
               <span>Order #</span>
-              <input name="order_number" defaultValue={order?.order_number ?? ""} placeholder="#1290 (optional)" />
+              <input name="order_number" defaultValue={order?.order_number ?? ""} placeholder="Leave blank — Shopify gives the number" />
             </label>
             <label className="field">
               <span>Source</span>
@@ -114,6 +133,34 @@ export default function OrderForm({ order }: { order?: Order }) {
                   <option key={s} value={s} />
                 ))}
               </datalist>
+            </label>
+            <label className="field">
+              <span>Payment</span>
+              <select name="payment" defaultValue={order?.financial_status === "pending" ? "pending" : "paid"}>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending / cash on delivery</option>
+              </select>
+            </label>
+            <label className="field full">
+              <span>Address</span>
+              <input name="address1" defaultValue={(order?.ship_address as Record<string, string> | null)?.address1 ?? ""} placeholder="House, street, area" />
+            </label>
+            <label className="field">
+              <span>City</span>
+              <input name="city" defaultValue={order?.ship_city ?? ""} />
+            </label>
+            <label className="field">
+              <span>State</span>
+              <input name="province" list="in-states" defaultValue={(order?.ship_address as Record<string, string> | null)?.province ?? ""} />
+              <datalist id="in-states">
+                {["Tamil Nadu", "Karnataka", "Kerala", "Andhra Pradesh", "Telangana", "Maharashtra", "Delhi", "Gujarat", "West Bengal", "Uttar Pradesh", "Rajasthan", "Punjab", "Haryana", "Madhya Pradesh", "Odisha", "Bihar", "Assam", "Goa", "Puducherry"].map((x) => (
+                  <option key={x} value={x} />
+                ))}
+              </datalist>
+            </label>
+            <label className="field">
+              <span>PIN code</span>
+              <input name="zip" inputMode="numeric" defaultValue={(order?.ship_address as Record<string, string> | null)?.zip ?? ""} />
             </label>
             <label className="field">
               <span>Channel</span>
@@ -169,7 +216,19 @@ export default function OrderForm({ order }: { order?: Order }) {
         </label>
       </div>
 
+      {!order && (
+        <label className="checkbox" style={{ marginTop: 16 }}>
+          <input type="checkbox" name="to_shopify" defaultChecked /> Also create this order in Shopify (no email is sent to the customer)
+        </label>
+      )}
       {state && <p className={state.ok ? "success" : "error"}>{state.message}</p>}
+      {state?.id && (
+        <p>
+          <Link className="link" href={`/order?id=${state.id}`}>
+            Open the saved entry
+          </Link>
+        </p>
+      )}
       <div className="form-actions">
         <button className="btn primary" disabled={busy || !me}>
           {busy ? "Saving…" : order ? "Save changes" : "Add to the book"}

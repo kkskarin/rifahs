@@ -246,6 +246,11 @@ export type OrderInput = {
   source?: string | null;
   channel?: string;
   order_number?: string | null;
+  address1?: string | null;
+  city?: string | null;
+  province?: string | null;
+  zip?: string | null;
+  payment?: "paid" | "pending";
 };
 
 export async function saveOrder(me: Profile, existing: Order | null, input: OrderInput): Promise<Result> {
@@ -273,6 +278,12 @@ export async function saveOrder(me: Profile, existing: Order | null, input: Orde
     fields.source = input.source || null;
     fields.channel = input.channel || "Manual";
     fields.order_number = input.order_number || null;
+    fields.ship_city = input.city || null;
+    fields.ship_address =
+      input.address1 || input.city || input.zip
+        ? { address1: input.address1 || null, city: input.city || null, province: input.province || null, zip: input.zip || null, country: input.ship_country || "India" }
+        : null;
+    fields.financial_status = input.payment ?? "paid";
   }
   if (existing && fields.status === "dispatched" && existing.status !== "dispatched") fields.dispatched_at = now();
 

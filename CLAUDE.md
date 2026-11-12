@@ -12,4 +12,5 @@
 ## Stack
 Next.js (static pages; data loaded in the browser from Supabase with row-level security),
 Supabase project "Rifah's Kaleidoscope" (cqirofbbxoedbirijnva, Mumbai), Netlify hosting,
-Shopify read-only sync (never write to Shopify).
+Shopify sync is read-only, with ONE allowed write: creating a manual entry as a Shopify order
+(`createShopifyOrder`, at the user's request). Never edit, fulfil or cancel Shopify orders.

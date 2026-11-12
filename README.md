@@ -17,7 +17,7 @@ Styled after rifahs.com: cream `#F4EAC4`, cocoa ink `#2A1416`, wine `#822537`, F
 | **Team** *(admins)* | Give or remove access; roles: Owner, Admin, Staff (staff never see money). |
 | **Shopify** *(admins)* | Connection status and "Sync now". Read-only — nothing is ever written to Shopify. |
 
-**Shopify sync (read-only):** the app never writes to Shopify. New and updated orders are pulled every
+**Shopify sync:** read-only, with one exception — a manual entry made in Core can be created as an order in Shopify (needs the `write_orders` scope; `read_products` lets it match the real product and size). New and updated orders are pulled every
 10 minutes (and on "Sync orders now"). The team's statuses and notes are never overwritten; Shopify only
 moves an order forward (fulfilled → Dispatched, cancelled, refunded). Dispatching here does not touch
 Shopify.

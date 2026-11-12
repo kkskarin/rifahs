@@ -4,6 +4,9 @@ import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { mutate } from "swr";
+import { pushOrderToShopify } from "../actions";
+import { safe } from "@/lib/safe";
 import OrderForm from "@/components/OrderForm";
 import { DispatchForm } from "@/components/OrderList";
 import { dateTime, itemsLine, money } from "@/lib/format";
@@ -22,6 +25,7 @@ export default function OrderPage() {
   const { data: issues } = useIssues();
   const { data: people } = useTeam(true);
   const [note, setNote] = useState("");
+  const [push, setPush] = useState<{ busy?: boolean; ok?: boolean; message?: string }>({});
 
   const o = orders?.find((x) => x.id === id);
   if (!orders) return <p className="empty">Loading…</p>;
@@ -80,6 +84,24 @@ export default function OrderPage() {
             <a className="link" href={`${SHOP_ADMIN}/orders/${o.shopify_id}`} target="_blank" rel="noreferrer">
               Open in Shopify ↗
             </a>
+          </p>
+        )}
+        {!o.shopify_id && !o.is_internal && (
+          <p style={{ marginBottom: 0 }}>
+            <button
+              className="btn small"
+              disabled={push.busy}
+              onClick={async () => {
+                if (!confirm("Create this entry as an order in Shopify? No email is sent to the customer.")) return;
+                setPush({ busy: true });
+                const r = (await safe(() => pushOrderToShopify(o.id))) as { ok: boolean; message?: string };
+                await mutate("orders");
+                setPush(r);
+              }}
+            >
+              {push.busy ? "Creating…" : "Create in Shopify"}
+            </button>{" "}
+            {push.message && <span className={push.ok ? "success" : "error"}>{push.message}</span>}
           </p>
         )}
         {open && (

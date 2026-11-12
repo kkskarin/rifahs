@@ -42,7 +42,8 @@ export default function SettingsPage() {
         </tbody>
       </table>
       <p className="hint">
-        This app only <b>reads</b> from Shopify — it never changes orders, fulfilments or settings there. New and updated
+        Core reads orders from Shopify. The only thing it ever writes is a <b>new manual order</b> when you add an entry here
+        and tick “Also create this order in Shopify” — it never edits or fulfils existing Shopify orders. New and updated
         orders are pulled in automatically every 10 minutes; press Sync to pull them now. Your team&apos;s statuses and notes
         are never overwritten.
       </p>
