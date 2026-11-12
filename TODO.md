@@ -6,4 +6,4 @@
 4. **Picture upload for shippers other than Delhivery** (e.g. ST Courier receipts / proof of dispatch).
 5. **Add sales order: selectable items** — pick the product and its variant from a list, with an option
    for custom pricing; add shipping charges (currently missing from the entry form).
-6. **"Add to Home Screen" has no logo** — the phone home-screen icon is missing.
+6. ~~"Add to Home Screen" has no logo~~ — done (round logo on cream; on preview).

@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: { default: "Kaleidoscope · Core", template: "%s · Kaleidoscope · Core" },
   description: "Orders, inventory and money for Kaleidoscope by Rifah — for Rifah's team.",
   robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: "Core", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#F4EAC4" };
