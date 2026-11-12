@@ -323,7 +323,8 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .appbar .brand img { height: 36px; width: auto; display: block; }
 .headers {
   flex: 1; min-width: 0; display: flex; justify-content: center; gap: 4px; height: 100%;
-  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-snap-type: x proximity;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior: contain; touch-action: pan-x;
+  scrollbar-width: none; scroll-snap-type: x proximity;
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
 }
@@ -332,7 +333,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .header-link {
   flex: none; display: flex; align-items: center; padding: 0 clamp(10px, 1.6vw, 20px); scroll-snap-align: center;
   text-decoration: none; color: var(--muted); font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase;
-  font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-weight: 500; height: 100%; box-sizing: border-box; border-bottom: 2px solid transparent;
 }
 .header-link:hover { color: var(--ink); }
 .header-link[aria-current="page"] { color: var(--wine); border-bottom-color: var(--wine); }
@@ -591,3 +592,7 @@ table.status-table td a.issue-tag, a.issue-tag { color: #fff; font-weight: 600; 
 
 .quick-add { margin-top: 18px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: #fffdf5; }
 .quick-add h3 { margin-bottom: 12px; }
+
+/* Installed as a home-screen app: keep the header clear of the phone's status bar / notch. */
+.appbar { padding-top: env(safe-area-inset-top, 0px); }
+.appbar-row { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--gutter), env(safe-area-inset-right, 0px)); }

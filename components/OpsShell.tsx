@@ -42,7 +42,13 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMenu(false);
     // keep the active header visible when the header row scrolls sideways
-    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+    // Sideways only: centre the active header in its strip without ever moving anything vertically.
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav) {
+      nav.scrollTop = 0;
+      if (active) nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+    }
   }, [path]);
 
   useEffect(() => {
