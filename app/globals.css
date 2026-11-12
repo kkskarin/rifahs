@@ -322,8 +322,10 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .appbar .brand { flex: none; display: flex; align-items: center; }
 .appbar .brand img { height: 36px; width: auto; display: block; }
 .headers {
-  flex: 1; min-width: 0; display: flex; justify-content: center; gap: 4px; height: 100%;
-  overflow-x: auto; overflow-y: hidden; overscroll-behavior: contain; touch-action: pan-x;
+  flex: 1; min-width: 0; display: flex; justify-content: center; align-items: stretch; gap: 4px;
+  /* Fixed pixel height (not %), so iPhone Safari/Chrome can never find anything to scroll vertically. */
+  height: var(--appbar-h); min-height: var(--appbar-h); max-height: var(--appbar-h);
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior: none; touch-action: pan-x; -webkit-overflow-scrolling: auto;
   scrollbar-width: none; scroll-snap-type: x proximity;
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
@@ -333,7 +335,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .header-link {
   flex: none; display: flex; align-items: center; padding: 0 clamp(10px, 1.6vw, 20px); scroll-snap-align: center;
   text-decoration: none; color: var(--muted); font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase;
-  font-weight: 500; height: 100%; box-sizing: border-box; border-bottom: 2px solid transparent;
+  font-weight: 500; height: var(--appbar-h); box-sizing: border-box; border-bottom: 2px solid transparent; white-space: nowrap; line-height: 1;
 }
 .header-link:hover { color: var(--ink); }
 .header-link[aria-current="page"] { color: var(--wine); border-bottom-color: var(--wine); }
@@ -596,3 +598,5 @@ table.status-table td a.issue-tag, a.issue-tag { color: #fff; font-weight: 600; 
 /* Installed as a home-screen app: keep the header clear of the phone's status bar / notch. */
 .appbar { padding-top: env(safe-area-inset-top, 0px); }
 .appbar-row { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--gutter), env(safe-area-inset-right, 0px)); }
+
+.build-tag { padding: 8px 12px 4px; font-size: 11px; color: var(--faint); border-top: 1px solid var(--line); margin-top: 4px; }

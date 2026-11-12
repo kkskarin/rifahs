@@ -51,6 +51,17 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     }
   }, [path]);
 
+  // Belt and braces for iPhone: if the header strip ever gets nudged vertically, snap it straight back.
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const fix = () => {
+      if (nav.scrollTop !== 0) nav.scrollTop = 0;
+    };
+    nav.addEventListener("scroll", fix, { passive: true });
+    return () => nav.removeEventListener("scroll", fix);
+  }, []);
+
   useEffect(() => {
     if (!menu) return;
     const close = (e: MouseEvent) => !menuRef.current?.contains(e.target as Node) && setMenu(false);
@@ -107,6 +118,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
                 <button role="menuitem" onClick={signOutEverywhere}>
                   Sign out
                 </button>
+                <div className="build-tag">Version {process.env.NEXT_PUBLIC_BUILD}</div>
               </div>
             )}
           </div>
