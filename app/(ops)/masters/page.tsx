@@ -57,7 +57,7 @@ export default function MastersPage() {
 
       <div className="panel" style={{ padding: 0 }}>
         <div className="scroll-x">
-          <table className="t">
+          <table className="t stack">
             <thead>
               <tr>
                 <th>Design</th>
@@ -79,15 +79,15 @@ export default function MastersPage() {
               ) : (
                 list.map((p) => (
                   <tr key={p.id}>
-                    <td>
+                    <td className="stack-title">
                       <b>{p.name}</b>
                     </td>
-                    <td className="hint">{p.aliases.join(", ")}</td>
-                    <td>{p.category}</td>
-                    <td>{p.collection}</td>
-                    <td className="n">{p.low_at}</td>
-                    <td className="hint">{p.notes}</td>
-                    <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
+                    <td className="hint" data-label="Other spellings">{p.aliases.join(", ")}</td>
+                    <td data-label="Type">{p.category}</td>
+                    <td data-label="Collection">{p.collection}</td>
+                    <td className="n" data-label="Warn at">{p.low_at}</td>
+                    <td className="hint" data-label="Notes">{p.notes}</td>
+                    <td className="stack-actions">
                       <button className="link" onClick={() => setEditing(p)}>
                         Edit
                       </button>{" "}

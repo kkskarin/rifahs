@@ -123,7 +123,7 @@ export default function TeamPage() {
 
       <div className="panel" style={{ padding: 0 }}>
         <div className="scroll-x">
-          <table className="t">
+          <table className="t stack">
             <thead>
               <tr>
                 <th>Name</th>
@@ -164,7 +164,7 @@ function Row({ p, me, pending, owner, onLink }: { p: Profile; me: Profile; pendi
 
   return (
     <tr style={{ opacity: p.active ? 1 : 0.5 }}>
-      <td>
+      <td className="stack-title">
         <input
           className="name-edit"
           aria-label="Name"
@@ -181,8 +181,8 @@ function Row({ p, me, pending, owner, onLink }: { p: Profile; me: Profile; pendi
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
         />
       </td>
-      <td>{p.email}</td>
-      <td>
+      <td data-label="Email">{p.email}</td>
+      <td data-label="Role">
         {canEdit && p.active ? (
           <select aria-label="Role" defaultValue={p.role} disabled={busy} onChange={(e) => run({ role: e.target.value as TeamRole })} style={{ padding: "4px 6px" }}>
             <option value="staff">Staff</option>
@@ -193,8 +193,8 @@ function Row({ p, me, pending, owner, onLink }: { p: Profile; me: Profile; pendi
           <span style={{ textTransform: "capitalize" }}>{p.role}</span>
         )}
       </td>
-      <td className="hint">{status}</td>
-      <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
+      <td className="hint" data-label="Status">{status}</td>
+      <td className="stack-actions">
         {owner && p.active && (
           <button
             className="link"

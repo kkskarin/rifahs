@@ -153,11 +153,10 @@ export default function ReportsPage() {
           <p className="hint">{expenses ? "No expenses logged yet." : "Loading…"}</p>
         ) : (
           <div className="scroll-x">
-            <table className="t">
+            <table className="t stack">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Category</th>
+                  <th>Date · Category</th>
                   <th>Paid to</th>
                   <th>Note</th>
                   <th className="n">Amount</th>
@@ -167,12 +166,11 @@ export default function ReportsPage() {
               <tbody>
                 {expenses.map((e) => (
                   <tr key={e.id}>
-                    <td>{shortDate(e.spent_on)}</td>
-                    <td>{e.category}</td>
-                    <td>{e.paid_to}</td>
-                    <td className="hint">{e.note}</td>
-                    <td className="n">{money(Number(e.amount))}</td>
-                    <td>
+                    <td className="stack-title">{shortDate(e.spent_on)} · {e.category}</td>
+                    <td data-label="Paid to">{e.paid_to}</td>
+                    <td className="hint" data-label="Note">{e.note}</td>
+                    <td className="n" data-label="Amount">{money(Number(e.amount))}</td>
+                    <td className="stack-actions">
                       <button className="link" onClick={() => confirm("Delete this expense?") && deleteExpense(e.id)} aria-label="Delete expense">
                         ✕
                       </button>
