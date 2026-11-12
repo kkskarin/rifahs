@@ -33,8 +33,11 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-/* Never let one wide element slide the whole page sideways on a phone. */
-body { overflow-x: clip; }
+/* Never let one wide element slide the whole page sideways on a phone, and stop the
+   iPhone "rubber band" bounce that drags the sticky header up and down with the page. */
+html, body { overflow-x: clip; overscroll-behavior-y: none; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.appbar, .page { max-width: 100vw; }
 .page, .panel, .card { min-width: 0; overflow-wrap: anywhere; }
 body {
   background: var(--bg);
@@ -301,6 +304,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .headers {
   flex: 1; min-width: 0; display: flex; justify-content: center; gap: 4px; height: 100%;
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-snap-type: x proximity;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
 }
 .headers::-webkit-scrollbar { display: none; }
