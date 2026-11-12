@@ -154,14 +154,14 @@ export async function saveProduct(
   return { ok: true as const };
 }
 
-export type ShopStock = { variant_id: number; product_id: number; product_title: string; variant_title: string; product_status: string; quantity: number | null };
+export type ShopStock = { variant_id: number; product_id: number; product_title: string; variant_title: string; product_status: string; quantity: number | null; price?: number | null };
 
 /** Shopify's own available quantities (read-only copy, refreshed with every sync). */
 export function useShopifyStock() {
   return useSWR<ShopStock[]>(
     "shopify-stock",
     async () => {
-      const { data, error } = await sb().from("shopify_stock").select("variant_id, product_id, product_title, variant_title, product_status, quantity").limit(5000);
+      const { data, error } = await sb().from("shopify_stock").select("variant_id, product_id, product_title, variant_title, product_status, quantity, price").limit(5000);
       if (error) throw error;
       return (data ?? []) as ShopStock[];
     },

@@ -90,16 +90,15 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
   const total = Number(o.total ?? 0);
   if (!(total > 0)) return { ok: false, message: "Enter the amount before sending to Shopify." };
 
-  // Core stores one amount per order; Shopify needs a price per piece. Use item prices when present,
-  // otherwise split the amount evenly across the pieces (any rounding goes on the first piece).
+  // Use each item's own price. Older entries have only an order amount: split it evenly across the pieces.
   const pieces = items.reduce((n, i) => n + Number(i.quantity || 1), 0);
   const priced = items.every((i) => typeof i.price === "number" && i.price > 0);
-  const each = Math.floor((total / pieces) * 100) / 100;
-  const lines = items.map((i) => ({ title: i.title, size: i.size ?? null, quantity: Number(i.quantity || 1), price: priced ? Number(i.price) : each }));
-  if (!priced) {
-    const diff = Math.round((total - each * pieces) * 100) / 100;
-    if (diff > 0 && lines[0].quantity === 1) lines[0].price = Math.round((lines[0].price + diff) * 100) / 100;
-  }
+  const shipping = Number(o.shipping_charge ?? 0);
+  const each = Math.floor(((total - shipping) / pieces) * 100) / 100;
+  const lines = items.map((i) => ({ title: i.title, size: i.size ?? null, quantity: Number(i.quantity || 1), price: priced ? Number(i.price) : each, taxRate: Number(i.tax_rate ?? 0) }));
+  const paidAmount = Number(o.amount_paid ?? (o.financial_status === "pending" ? 0 : total));
+  const fullyPaid = paidAmount >= total;
+  const paymentNote = fullyPaid ? "" : `Payment: ${paidAmount > 0 ? `₹${paidAmount} received, ` : ""}₹${Math.round((total - paidAmount) * 100) / 100} balance${o.payment_terms ? ` — ${o.payment_terms}` : ""}`;
 
   try {
     const r = await createShopifyOrder({
@@ -108,8 +107,11 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
       phone: o.customer_phone,
       address: o.ship_address ?? (o.ship_city ? { city: o.ship_city, country: o.ship_country } : null),
       items: lines,
-      paid: o.financial_status !== "pending",
-      note: o.notes ?? "",
+      taxMode: o.tax_mode ?? "none",
+      taxType: o.tax_type ?? "",
+      shipping,
+      paid: fullyPaid,
+      note: [o.notes ?? "", paymentNote].filter(Boolean).join("\n"),
       tags: ["Kaleidoscope Core", o.channel, o.is_express ? "Express" : "", o.is_exchange ? "Exchange" : ""].filter(Boolean),
     });
     await db

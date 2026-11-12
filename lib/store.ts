@@ -6,6 +6,7 @@
 import useSWR, { mutate } from "swr";
 import { sb } from "./supabase-browser";
 import { cleanItemsInput } from "./items";
+import { entryTotals, toItems, type EntryLine } from "./entry";
 import {
   OPEN_STATUSES,
   STATUSES,
@@ -17,12 +18,14 @@ import {
   type OrderEvent,
   type OrderStatus,
   type Profile,
+  type TaxMode,
+  type TaxType,
 } from "./types";
 
 export type Result = { ok: boolean; message?: string; id?: string };
 
 const ORDER_COLS =
-  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
+  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, shipping_charge, tax_mode, tax_type, amount_paid, payment_terms, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
 
 const swrOpts = { revalidateOnFocus: true, dedupingInterval: 4000, keepPreviousData: true };
 
@@ -352,6 +355,80 @@ export async function saveOrder(me: Profile, existing: Order | null, input: Orde
   mutate("orders");
   mutate(["events", existing.id]);
   return { ok: true, message: "Saved" };
+}
+
+export type EntryInput = {
+  customer_name: string;
+  customer_phone: string | null;
+  customer_email: string | null;
+  address1: string | null;
+  city: string | null;
+  province: string | null;
+  zip: string | null;
+  ship_country: string | null;
+  lines: EntryLine[];
+  tax_mode: TaxMode;
+  tax_type: TaxType;
+  shipping_charge: number;
+  amount_paid: number;
+  payment_terms: string;
+  promise_date: string | null;
+  notes: string;
+  status: OrderStatus;
+  channel: string;
+  is_express: boolean;
+  is_international: boolean;
+  is_exchange: boolean;
+  is_internal: boolean;
+};
+
+/** Save a manual order entry (new, or an existing one that isn't linked to Shopify). */
+export async function saveEntry(me: Profile, existing: Order | null, e: EntryInput): Promise<Result> {
+  if (!e.customer_name.trim()) return { ok: false, message: "Customer name is required" };
+  const items = toItems(e.lines);
+  if (!items.length) return { ok: false, message: "Add at least one item" };
+  const t = entryTotals(e.lines.filter((l) => l.title.trim()), e.tax_mode, e.shipping_charge);
+  const paid = Math.max(Math.min(e.amount_paid || 0, t.total), 0);
+  const fields: Record<string, unknown> = {
+    customer_name: e.customer_name.trim(),
+    customer_phone: e.customer_phone,
+    customer_email: e.customer_email,
+    ship_city: e.city,
+    ship_country: e.ship_country,
+    ship_address: e.address1 || e.city || e.zip ? { address1: e.address1, city: e.city, province: e.province, zip: e.zip, country: e.ship_country || "India" } : null,
+    items,
+    total: t.total,
+    shipping_charge: t.shipping,
+    tax_mode: e.tax_mode,
+    tax_type: e.tax_mode === "none" ? "" : e.tax_type,
+    amount_paid: paid,
+    payment_terms: paid >= t.total ? "" : e.payment_terms,
+    financial_status: paid >= t.total && t.total > 0 ? "paid" : paid > 0 ? "partially_paid" : "pending",
+    promise_date: e.promise_date,
+    notes: e.notes,
+    status: STATUSES.includes(e.status) ? e.status : "new",
+    channel: e.channel || "Manual",
+    source: "Manual",
+    is_express: e.is_express,
+    is_international: e.is_international,
+    is_exchange: e.is_exchange,
+    is_internal: e.is_internal,
+    updated_by: me.id,
+  };
+  if (!existing) {
+    const { data, error } = await sb().from("orders").insert({ ...fields, created_by: me.id }).select("id").single();
+    if (error) return { ok: false, message: error.message };
+    await logEvents([{ order_id: data.id, kind: "edit", to_status: fields.status as OrderStatus, message: "Entry added", actor: me.id }]);
+    await mutate("orders");
+    return { ok: true, message: "Added", id: data.id };
+  }
+  if (fields.status === "dispatched" && existing.status !== "dispatched") fields.dispatched_at = now();
+  const { error } = await sb().from("orders").update(fields).eq("id", existing.id);
+  if (error) return { ok: false, message: error.message };
+  await logEvents([{ order_id: existing.id, kind: existing.status !== fields.status ? "status" : "edit", from_status: existing.status, to_status: fields.status as OrderStatus, message: existing.status !== fields.status ? "" : "Details edited", actor: me.id }]);
+  await mutate("orders");
+  mutate(["events", existing.id]);
+  return { ok: true, message: "Saved", id: existing.id };
 }
 
 /** Change one item's size here. Core is the record for production; the Shopify sync keeps the change. */

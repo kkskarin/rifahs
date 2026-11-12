@@ -76,7 +76,13 @@ export type OrderItem = {
   /** Set when the team changed the size here; the Shopify sync then leaves this item's size alone. */
   size_changed?: boolean;
   original_size?: string | null;
+  /** GST % on this line (manual entries). */
+  tax_rate?: number | null;
 };
+export type TaxMode = "none" | "inclusive" | "exclusive";
+export type TaxType = "" | "cgst_sgst" | "igst";
+export const GST_RATES = [0, 5, 12, 18];
+export const PAYMENT_TERMS = ["Due on dispatch", "Cash on delivery", "Advance paid, balance on dispatch", "Credit — pay later", "Other"];
 export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Unstitched", "Free size"];
 
 export type Order = {
@@ -98,6 +104,11 @@ export type Order = {
   is_international: boolean;
   is_internal: boolean;
   is_exchange: boolean;
+  shipping_charge?: number;
+  tax_mode?: TaxMode;
+  tax_type?: TaxType;
+  amount_paid?: number | null;
+  payment_terms?: string;
   ship_country: string | null;
   ship_city: string | null;
   ship_address: Record<string, unknown> | null;

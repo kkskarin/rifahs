@@ -7,6 +7,7 @@ import { useState } from "react";
 import { mutate } from "swr";
 import { pushOrderToShopify } from "../actions";
 import { safe } from "@/lib/safe";
+import EntryForm from "@/components/EntryForm";
 import OrderForm from "@/components/OrderForm";
 import { DispatchForm } from "@/components/OrderList";
 import { dateTime, itemsLine, money } from "@/lib/format";
@@ -156,7 +157,7 @@ export default function OrderPage() {
         </div>
       </div>
 
-      <OrderForm key={o.updated_at} order={o} />
+      {o.shopify_id ? <OrderForm key={o.updated_at} order={o} /> : <EntryForm key={o.updated_at} order={o} />}
 
       <div className="panel">
         <h3>Activity</h3>

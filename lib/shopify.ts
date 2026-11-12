@@ -179,7 +179,11 @@ export type NewShopifyOrder = {
   email: string | null;
   phone: string | null;
   address: { address1?: string | null; city?: string | null; province?: string | null; zip?: string | null; country?: string | null } | null;
-  items: { title: string; size: string | null; quantity: number; price: number }[];
+  items: { title: string; size: string | null; quantity: number; price: number; taxRate?: number }[];
+  /** GST: "none", "inclusive" (prices contain GST) or "exclusive" (GST added on top), and how it splits. */
+  taxMode?: "none" | "inclusive" | "exclusive";
+  taxType?: "" | "cgst_sgst" | "igst";
+  shipping?: number;
   paid: boolean;
   note: string;
   tags: string[];
@@ -219,6 +223,16 @@ async function findVariant(title: string, size: string | null): Promise<string |
   }
 }
 
+/** GST lines for one item, split CGST + SGST or as IGST, so Shopify's tax report matches Core's. */
+function taxLinesFor(it: NewShopifyOrder["items"][number], mode: string, type: string) {
+  const rate = (it.taxRate ?? 0) / 100;
+  if (mode === "none" || !rate) return null;
+  const gross = it.price * it.quantity;
+  const tax = mode === "inclusive" ? gross - gross / (1 + rate) : gross * rate;
+  const line = (title: string, r: number, amt: number) => ({ title, rate: Number(r.toFixed(4)), priceSet: { shopMoney: { amount: amt.toFixed(2), currencyCode: "INR" } } });
+  return { taxLines: type === "cgst_sgst" ? [line("CGST", rate / 2, tax / 2), line("SGST", rate / 2, tax / 2)] : [line("IGST", rate, tax)] };
+}
+
 export async function createShopifyOrder(o: NewShopifyOrder) {
   const [first, ...rest] = o.name.trim().split(/\s+/);
   const last = rest.join(" ") || first;
@@ -231,6 +245,7 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
       ...(variantId ? { variantId } : { title: it.title, ...(it.size ? { variantTitle: it.size } : {}), requiresShipping: true }),
       quantity: it.quantity,
       priceSet: { shopMoney: { amount: it.price.toFixed(2), currencyCode: "INR" } },
+      ...(taxLinesFor(it, o.taxMode ?? "none", o.taxType ?? "") ?? {}),
     });
   }
   const a = o.address;
@@ -241,6 +256,10 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
     currency: "INR",
     lineItems,
     financialStatus: o.paid ? "PAID" : "PENDING",
+    ...(o.taxMode && o.taxMode !== "none" ? { taxesIncluded: o.taxMode === "inclusive" } : {}),
+    ...(o.shipping && o.shipping > 0
+      ? { shippingLines: [{ title: "Shipping", priceSet: { shopMoney: { amount: o.shipping.toFixed(2), currencyCode: "INR" } } }] }
+      : {}),
     note: o.note || undefined,
     tags: o.tags,
     ...(o.email ? { email: o.email } : {}),
@@ -282,6 +301,7 @@ export type ShopifyVariantStock = {
   variantTitle: string;
   status: string;
   quantity: number | null;
+  price: number | null;
 };
 
 /** What Shopify says is available to buy, per product and size. Needs the read_products permission. */
@@ -291,13 +311,13 @@ export async function fetchStock(): Promise<ShopifyVariantStock[]> {
   for (let page = 0; page < 20; page++) {
     const data: {
       products: {
-        nodes: { legacyResourceId: string; title: string; status: string; variants: { nodes: { legacyResourceId: string; title: string; inventoryQuantity: number | null }[] } }[];
+        nodes: { legacyResourceId: string; title: string; status: string; variants: { nodes: { legacyResourceId: string; title: string; inventoryQuantity: number | null; price: string | null }[] } }[];
         pageInfo: { hasNextPage: boolean; endCursor: string | null };
       };
     } = await shopifyGraphQL(
       `query($after: String) {
         products(first: 40, after: $after) {
-          nodes { legacyResourceId title status variants(first: 60) { nodes { legacyResourceId title inventoryQuantity } } }
+          nodes { legacyResourceId title status variants(first: 60) { nodes { legacyResourceId title inventoryQuantity price } } }
           pageInfo { hasNextPage endCursor }
         }
       }`,
@@ -312,6 +332,7 @@ export async function fetchStock(): Promise<ShopifyVariantStock[]> {
           variantTitle: v.title === "Default Title" ? "" : v.title,
           status: p.status,
           quantity: v.inventoryQuantity,
+          price: v.price ? Number(v.price) : null,
         });
     if (!data.products.pageInfo.hasNextPage) break;
     after = data.products.pageInfo.endCursor;

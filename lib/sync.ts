@@ -277,6 +277,7 @@ export async function syncStock() {
           variant_title: r.variantTitle,
           product_status: r.status.toLowerCase(),
           quantity: r.quantity,
+          price: r.price,
           synced_at: now,
         })),
       );

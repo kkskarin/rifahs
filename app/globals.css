@@ -660,3 +660,25 @@ html[data-font="large"] .login, html[data-font="xlarge"] .login { padding: 14px;
 .shop-size { border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
 .shop-size b { font-weight: 600; }
 .shop-size.zero { color: var(--faint); border-style: dashed; }
+
+/* ── Order entry ────────────────────────── */
+.entry-tax { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 320px)); margin-bottom: 12px; }
+table.entry-table input, table.entry-table select {
+  width: 100%; min-width: 0; border: 1px solid var(--line-strong); background: var(--field); color: var(--ink); border-radius: 4px; padding: 8px 9px; font: inherit;
+}
+table.entry-table td { vertical-align: middle; }
+table.entry-table td.n input { text-align: right; }
+@media (min-width: 901px) {
+  table.entry-table th:nth-child(1) { width: 34%; }
+  table.entry-table td:nth-child(2) select { min-width: 96px; }
+  table.entry-table td:nth-child(3) input { width: 72px; margin-left: auto; display: block; }
+  table.entry-table td:nth-child(4) input { width: 110px; margin-left: auto; display: block; }
+}
+.entry-totals { display: flex; flex-wrap: wrap; gap: 16px 40px; justify-content: space-between; align-items: flex-start; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.entry-totals .field { flex: 0 1 220px; }
+.entry-totals dl { margin: 0; min-width: min(100%, 300px); display: grid; gap: 4px; }
+.entry-totals dl > div { display: flex; justify-content: space-between; gap: 24px; font-variant-numeric: tabular-nums; }
+.entry-totals dt { color: var(--muted); }
+.entry-totals dd { margin: 0; }
+.entry-totals .grand { border-top: 1px solid var(--line-strong); padding-top: 8px; margin-top: 4px; font-family: var(--serif); font-size: 21px; }
+.entry-totals .grand dt { color: var(--ink); }
