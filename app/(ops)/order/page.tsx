@@ -188,7 +188,7 @@ export default function OrderPage() {
         {sizeMsg.message && <p className={sizeMsg.ok ? "success" : "error"}>{sizeMsg.message}</p>}
       </div>
 
-      {o.shopify_id ? <OrderForm key={o.updated_at} order={o} /> : <EntryForm key={o.updated_at} order={o} />}
+      {o.shopify_id ? <OrderForm key={o.updated_at} order={o} /> : <EntryForm key={o.id} order={o} />}
 
       <div className="panel">
         <h3>Activity</h3>
