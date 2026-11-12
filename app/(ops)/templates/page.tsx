@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import SettingsTabs from "@/components/SettingsTabs";
 import useSWR, { mutate } from "swr";
 import { emailSetup, sendTestEmail } from "../../auth-actions";
 import { fill, renderEmail, SAMPLE_VARS, TEMPLATE_VARIABLES, type EmailTemplate } from "@/lib/email-render";
@@ -47,10 +48,8 @@ export default function TemplatesPage() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>Email templates</h1>
-        <p>The emails Kaleidoscope Core sends from no-reply@rifahs.com. Edit the words here; the design stays on-brand.</p>
-      </div>
+      <SettingsTabs />
+      <p className="hint" style={{ marginTop: 0 }}>The emails Kaleidoscope Core sends from no-reply@rifahs.com. Edit the words here; the design stays on-brand.</p>
 
       {setup && <p className={setup.ready ? "success" : "error"} style={{ marginTop: -8 }}>{setup.text}</p>}
       <nav className="chips">

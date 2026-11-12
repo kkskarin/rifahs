@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SettingsTabs from "@/components/SettingsTabs";
 import { mutate } from "swr";
 import { syncShopifyNow } from "../actions";
 import { dateTime } from "@/lib/format";
@@ -19,6 +20,8 @@ export default function SettingsPage() {
   if (me && !admin) return <p className="empty">Only owners and admins manage Shopify.</p>;
 
   return (
+    <>
+    <SettingsTabs />
     <div className="panel">
       <h2>Shopify connection</h2>
       <table className="t" style={{ marginBottom: 18 }}>
@@ -65,5 +68,6 @@ export default function SettingsPage() {
       </div>
       {msg && <p className={msg.ok ? "success" : "error"}>{msg.message}</p>}
     </div>
+    </>
   );
 }

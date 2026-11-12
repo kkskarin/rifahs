@@ -20,3 +20,13 @@ alter table public.issue_updates enable row level security;
 create policy "team reads issue updates" on public.issue_updates for select using (public.is_team_member());
 create policy "team adds issue updates" on public.issue_updates for insert with check (public.is_team_member());
 alter table public.orders add column if not exists is_exchange boolean not null default false;
+
+-- Personal details and preferences (applied live as "profile_personalise"; also adds a self-update policy
+-- and extends guard_owner_role() so nobody can change their own role, access or sign-in email).
+alter table public.profiles
+  add column if not exists avatar_url text,
+  add column if not exists phone text not null default '',
+  add column if not exists contact_email text not null default '',
+  add column if not exists dob date,
+  add column if not exists gender text not null default '',
+  add column if not exists prefs jsonb not null default '{}';

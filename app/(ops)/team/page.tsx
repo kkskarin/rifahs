@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SettingsTabs from "@/components/SettingsTabs";
 import useSWR, { mutate } from "swr";
 import { createInvite, createSetPasswordLink } from "../../auth-actions";
 import { updateMember } from "../actions";
@@ -63,10 +64,7 @@ export default function TeamPage() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>Team</h1>
-        <p>Who can use Kaleidoscope Core, and what they can see.</p>
-      </div>
+      <SettingsTabs />
 
       {owner ? (
         <form

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isAdmin } from "@/lib/roles";
-import { signOutEverywhere, useMe } from "@/lib/store";
+import Avatar from "./Avatar";
+import { applyPrefs } from "@/lib/prefs";
+import { setViewAs, signOutEverywhere, useMe, useRealMe, useTeam } from "@/lib/store";
 
 export const APP_NAME = "Kaleidoscope · Core";
 
@@ -20,17 +22,25 @@ export const HEADERS: Header[] = [
   { label: "Reports", href: "/reports", match: ["/reports"], adminOnly: true },
 ];
 
-const SETTINGS: { label: string; href: string; adminOnly?: boolean; ownerOnly?: boolean }[] = [
-  { label: "Team", href: "/team", adminOnly: true },
-  { label: "Email templates", href: "/templates", adminOnly: true },
-  { label: "Shopify", href: "/settings", adminOnly: true },
-];
 
+
+const SETTINGS_PATHS = ["/team", "/templates", "/settings", "/personalise"];
+const nameFromEmail = (e: string) => {
+  const n = e.split("@")[0].split(/[._\-+0-9]/)[0];
+  return n ? n[0].toUpperCase() + n.slice(1) : e;
+};
 
 export default function OpsShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { data: me, isLoading } = useMe();
   const admin = me ? isAdmin(me) : false;
+  const { data: real } = useRealMe();
+  const { data: team } = useTeam(real?.role === "owner");
+
+  // Each person's own theme and text size, wherever they sign in.
+  useEffect(() => {
+    if (real) applyPrefs(real.prefs);
+  }, [real]);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -81,6 +91,12 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     <>
       <header className="appbar">
         {isPreview && <div className="preview-banner">Preview version — not live yet. Orders and stock you change here are real.</div>}
+        {me?.viewingAs && (
+          <div className="viewas-banner">
+            Viewing as <b>{me.full_name || nameFromEmail(me.email)}</b> ({me.role}) — this is what they see.{" "}
+            <button onClick={() => setViewAs(null)}>Back to my view</button>
+          </div>
+        )}
         <div className="appbar-row">
           <Link href="/" className="brand" aria-label={`${APP_NAME} home`}>
             {/* Phones: just the kaleidoscope mark. Tablets and up: the full logo. */}
@@ -98,7 +114,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="settings" ref={menuRef}>
-            <button className="settings-btn" aria-label="Settings" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+            <button className={`settings-btn${me?.viewingAs ? " is-viewing" : ""}`} aria-label="Account and settings" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
               <span />
               <span />
               <span />
@@ -106,15 +122,36 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
             {menu && (
               <div className="settings-menu" role="menu">
                 <div className="who-block">
-                  <b>{me?.full_name || "—"}</b>
-                  <span>{me?.email}</span>
-                  {me && <small>{me.role[0].toUpperCase() + me.role.slice(1)}</small>}
+                  <Avatar p={me} size={44} />
+                  <div>
+                    <b>{me ? me.full_name || nameFromEmail(me.email) : "—"}</b>
+                    <span>{me?.email}</span>
+                  </div>
                 </div>
-                {SETTINGS.filter((s) => !s.adminOnly || admin).map((s) => (
-                  <Link key={s.href} href={s.href} role="menuitem" aria-current={path === s.href ? "page" : undefined}>
-                    {s.label}
-                  </Link>
-                ))}
+                {real?.role === "owner" && (
+                  <label className="viewas">
+                    <span>View as</span>
+                    <select
+                      value={me?.viewingAs ?? ""}
+                      onChange={(e) => {
+                        setViewAs((team ?? []).find((p) => p.id === e.target.value) ?? null);
+                        setMenu(false);
+                      }}
+                    >
+                      <option value="">Myself ({real.full_name || nameFromEmail(real.email)})</option>
+                      {(team ?? [])
+                        .filter((p) => p.active && p.id !== real.id)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.full_name || nameFromEmail(p.email)} — {p.role}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+                <Link href={admin ? "/team" : "/personalise"} role="menuitem" aria-current={SETTINGS_PATHS.includes(path) ? "page" : undefined}>
+                  Settings
+                </Link>
                 <button role="menuitem" onClick={signOutEverywhere}>
                   Sign out
                 </button>

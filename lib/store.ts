@@ -28,7 +28,8 @@ const swrOpts = { revalidateOnFocus: true, dedupingInterval: 4000, keepPreviousD
 
 // ───────────────────────── Reads ─────────────────────────
 
-export function useMe() {
+/** The person actually signed in. */
+export function useRealMe() {
   return useSWR<Profile | null>(
     "me",
     async () => {
@@ -40,6 +41,37 @@ export function useMe() {
     },
     { revalidateOnFocus: false },
   );
+}
+
+const readViewAs = (): Profile | null => {
+  try {
+    return JSON.parse(sessionStorage.getItem("view-as") ?? "null");
+  } catch {
+    return null;
+  }
+};
+
+/** Owners can look at the app as another team member. Kept for this browser tab only. */
+export function setViewAs(target: Profile | null) {
+  try {
+    if (target) sessionStorage.setItem("view-as", JSON.stringify({ id: target.id, full_name: target.full_name, email: target.email, role: target.role, avatar_url: target.avatar_url ?? null }));
+    else sessionStorage.removeItem("view-as");
+  } catch {}
+  mutate("view-as");
+}
+
+/**
+ * Who the screens should behave as: normally you; while an owner uses "View as", that person's
+ * name and role. The id stays the owner's, so anything changed is still recorded under the owner.
+ */
+export function useMe() {
+  const real = useRealMe();
+  const { data: target } = useSWR<Profile | null>("view-as", async () => readViewAs(), { revalidateOnFocus: false });
+  const r = real.data;
+  const data = r && target && r.role === "owner" && target.id !== r.id
+    ? { ...r, role: target.role, full_name: target.full_name, email: target.email, avatar_url: target.avatar_url, viewingAs: target.id }
+    : r;
+  return { ...real, data };
 }
 
 export type OrderRow = Order & { items_text?: string };

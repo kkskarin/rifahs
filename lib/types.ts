@@ -7,7 +7,29 @@ export type Profile = {
   role: TeamRole;
   active: boolean;
   created_at: string;
+  avatar_url?: string | null;
+  phone?: string;
+  contact_email?: string;
+  dob?: string | null;
+  gender?: string;
+  prefs?: Prefs;
+  /** Set (in the browser only) while an owner is looking at the app as this person. */
+  viewingAs?: string;
 };
+export type Prefs = { theme?: string; font?: string };
+export const THEMES: { key: string; label: string; swatch: [string, string, string] }[] = [
+  { key: "cream", label: "Kaleidoscope cream", swatch: ["#f4eac4", "#fbf6e6", "#822537"] },
+  { key: "light", label: "Light", swatch: ["#f7f6f3", "#ffffff", "#822537"] },
+  { key: "dark", label: "Dark", swatch: ["#1b1213", "#2a1d1f", "#e3a4b0"] },
+  { key: "rose", label: "Rose", swatch: ["#f8e4e4", "#fdf3f2", "#8f2a44"] },
+  { key: "sage", label: "Sage", swatch: ["#e4ead8", "#f3f6ec", "#55622a"] },
+  { key: "indigo", label: "Indigo", swatch: ["#e2e6f3", "#f3f5fb", "#34407a"] },
+];
+export const FONT_SIZES = [
+  { key: "normal", label: "Normal" },
+  { key: "large", label: "Large" },
+  { key: "xlarge", label: "Extra large" },
+];
 
 export const STATUSES = [
   "new",
