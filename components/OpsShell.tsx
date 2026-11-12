@@ -11,6 +11,7 @@ export const APP_NAME = "Kaleidoscope · Core";
 type Header = { label: string; href: string; match: string[]; adminOnly?: boolean };
 export const HEADERS: Header[] = [
   { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order"] },
+  { label: "Order Status", href: "/status", match: ["/status"] },
   { label: "Purchase", href: "/purchase", match: ["/purchase"] },
   { label: "Inventory", href: "/inventory", match: ["/inventory"] },
   { label: "Disputes", href: "/disputes", match: ["/disputes"] },

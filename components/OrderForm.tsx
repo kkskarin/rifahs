@@ -34,6 +34,7 @@ export default function OrderForm({ order }: { order?: Order }) {
           is_express: b("is_express"),
           is_international: b("is_international"),
           is_internal: b("is_internal"),
+          is_exchange: b("is_exchange"),
           promise_date: n("promise_date"),
           ship_country: n("ship_country"),
           courier: n("courier"),
@@ -153,6 +154,9 @@ export default function OrderForm({ order }: { order?: Order }) {
           </label>
           <label className="checkbox">
             <input type="checkbox" name="is_international" defaultChecked={order?.is_international} /> International
+          </label>
+          <label className="checkbox" title="A replacement sent for an earlier order">
+            <input type="checkbox" name="is_exchange" defaultChecked={order?.is_exchange} /> Exchange
           </label>
           <label className="checkbox" title="Staff / test orders: never counted in sales, profit or order counts">
             <input type="checkbox" name="is_internal" defaultChecked={order?.is_internal} /> Internal / test order

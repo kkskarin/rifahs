@@ -131,6 +131,7 @@ const OrderCard = memo(function OrderCard({
       <div className="row2">
         <span className={`pill ${o.status}`}>{STATUS_LABEL[o.status]}</span>
         {o.is_internal && <span className="flag late">Internal</span>}
+        {o.is_exchange && <span className="flag intl">Exchange</span>}
         {o.is_express && <span className="flag express">Express</span>}
         {o.is_international && <span className="flag intl">International{o.ship_country ? ` · ${o.ship_country}` : ""}</span>}
         <span className="items">{itemsLine(o.items)}</span>

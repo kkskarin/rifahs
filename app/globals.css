@@ -531,3 +531,60 @@ table.queue td { padding: 8px 10px; border: 1px solid #e6d9b8; vertical-align: t
 .facts dt { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .facts dd { margin: 2px 0 0; font-size: 14.5px; }
 .facts dd a { color: var(--wine); }
+
+/* ── Order Status (colour-coded) ────────── */
+:root {
+  --st-new: #8a5a00; --st-new-bg: #fde9b8;
+  --st-printing: #6a3d9a; --st-printing-bg: #e9defa;
+  --st-stitching: #1f5f8b; --st-stitching-bg: #d9eaf7;
+  --st-checking: #0f6b6b; --st-checking-bg: #d3efec;
+  --st-ready: #a34a00; --st-ready-bg: #ffdcc2;
+  --st-dispatched: #44506b; --st-dispatched-bg: #dfe4f0;
+  --st-delivered: #2f5a2b; --st-delivered-bg: #d8ecd3;
+  --st-issue: #9b1c1c; --st-issue-bg: #f8d4d4;
+  --st-closed: #5c5557; --st-closed-bg: #e4e0dc;
+}
+.status-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.schip {
+  border: 1px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--ink); display: inline-flex; gap: 8px; align-items: center;
+}
+.schip b { font-weight: 600; }
+.schip[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+.st-new.schip, .status-select.st-new { background: var(--st-new-bg); color: var(--st-new); border-color: var(--st-new); }
+.st-printing.schip, .status-select.st-printing { background: var(--st-printing-bg); color: var(--st-printing); border-color: var(--st-printing); }
+.st-stitching.schip, .status-select.st-stitching { background: var(--st-stitching-bg); color: var(--st-stitching); border-color: var(--st-stitching); }
+.st-checking.schip, .status-select.st-checking { background: var(--st-checking-bg); color: var(--st-checking); border-color: var(--st-checking); }
+.st-ready.schip, .status-select.st-ready { background: var(--st-ready-bg); color: var(--st-ready); border-color: var(--st-ready); }
+.st-dispatched.schip, .status-select.st-dispatched { background: var(--st-dispatched-bg); color: var(--st-dispatched); border-color: var(--st-dispatched); }
+.st-delivered.schip, .status-select.st-delivered { background: var(--st-delivered-bg); color: var(--st-delivered); border-color: var(--st-delivered); }
+.st-issue.schip { background: var(--st-issue-bg); color: var(--st-issue); border-color: var(--st-issue); }
+.st-closed.schip, .status-select.st-closed { background: var(--st-closed-bg); color: var(--st-closed); border-color: var(--st-closed); }
+.status-select { border: 1px solid; border-radius: 4px; padding: 6px 8px; font: inherit; font-size: 13px; font-weight: 600; max-width: 100%; }
+.status-select option { background: #fff; color: var(--ink); font-weight: 400; }
+.status-cell { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.issue-tag { background: var(--st-issue); color: #fff; border-radius: 4px; padding: 3px 8px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; }
+table.status-table tr.st-new > td:first-child { box-shadow: inset 4px 0 0 var(--st-new); }
+table.status-table tr.st-printing > td:first-child { box-shadow: inset 4px 0 0 var(--st-printing); }
+table.status-table tr.st-stitching > td:first-child { box-shadow: inset 4px 0 0 var(--st-stitching); }
+table.status-table tr.st-checking > td:first-child { box-shadow: inset 4px 0 0 var(--st-checking); }
+table.status-table tr.st-ready > td:first-child { box-shadow: inset 4px 0 0 var(--st-ready); }
+table.status-table tr.st-dispatched > td:first-child { box-shadow: inset 4px 0 0 var(--st-dispatched); }
+table.status-table tr.st-delivered > td:first-child { box-shadow: inset 4px 0 0 var(--st-delivered); }
+table.status-table tr.st-closed > td:first-child { box-shadow: inset 4px 0 0 var(--st-closed); }
+table.status-table tr.st-closed { color: var(--muted); }
+table.status-table tr.has-issue { background: rgb(155 28 28 / 0.05); }
+table.status-table td a { color: var(--wine); font-weight: 600; }
+@media (max-width: 900px) {
+  table.status-table tr > td:first-child { box-shadow: none !important; }
+  table.status-table tr { border-left: 4px solid var(--st-closed); }
+  table.status-table tr.st-new { border-left-color: var(--st-new); }
+  table.status-table tr.st-printing { border-left-color: var(--st-printing); }
+  table.status-table tr.st-stitching { border-left-color: var(--st-stitching); }
+  table.status-table tr.st-checking { border-left-color: var(--st-checking); }
+  table.status-table tr.st-ready { border-left-color: var(--st-ready); }
+  table.status-table tr.st-dispatched { border-left-color: var(--st-dispatched); }
+  table.status-table tr.st-delivered { border-left-color: var(--st-delivered); }
+}
+table.status-table td a.issue-tag, a.issue-tag { color: #fff; font-weight: 600; }
+@media (min-width: 901px) { table.t .due { white-space: nowrap; } }

@@ -22,7 +22,7 @@ import {
 export type Result = { ok: boolean; message?: string; id?: string };
 
 const ORDER_COLS =
-  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
+  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
 
 const swrOpts = { revalidateOnFocus: true, dedupingInterval: 4000, keepPreviousData: true };
 
@@ -233,6 +233,7 @@ export type OrderInput = {
   is_express: boolean;
   is_international: boolean;
   is_internal: boolean;
+  is_exchange: boolean;
   promise_date: string | null;
   ship_country: string | null;
   courier: string | null;
@@ -257,6 +258,7 @@ export async function saveOrder(me: Profile, existing: Order | null, input: Orde
     is_express: input.is_express,
     is_international: input.is_international,
     is_internal: input.is_internal,
+    is_exchange: input.is_exchange,
     promise_date: input.promise_date,
     ship_country: input.ship_country,
     courier: input.courier,

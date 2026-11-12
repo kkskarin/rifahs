@@ -26,11 +26,11 @@ export type OrderStatus = (typeof STATUSES)[number];
 export const FLOW: OrderStatus[] = ["new", "printing", "stitching", "checking", "ready", "dispatched", "delivered"];
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
-  new: "New",
-  printing: "Printing",
+  new: "Open",
+  printing: "Fabric",
   stitching: "Stitching",
-  checking: "Checking",
-  ready: "Ready to ship",
+  checking: "QC & Packing",
+  ready: "Ready to Dispatch",
   dispatched: "Dispatched",
   delivered: "Delivered",
   refunded: "Refunded",
@@ -75,6 +75,7 @@ export type Order = {
   promise_date: string | null;
   is_international: boolean;
   is_internal: boolean;
+  is_exchange: boolean;
   ship_country: string | null;
   ship_city: string | null;
   ship_address: Record<string, unknown> | null;

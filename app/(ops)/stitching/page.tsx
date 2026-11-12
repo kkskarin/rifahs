@@ -13,8 +13,8 @@ import { STATUS_LABEL, type OrderStatus } from "@/lib/types";
 const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 const long = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 const STAGES: { key: OrderStatus; label: string }[] = [
-  { key: "new", label: "New" },
-  { key: "printing", label: "Printing / waiting for fabric" },
+  { key: "new", label: "Open" },
+  { key: "printing", label: "Fabric (waiting for fabric)" },
   { key: "stitching", label: "Already at stitching" },
 ];
 

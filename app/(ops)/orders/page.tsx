@@ -14,7 +14,7 @@ import { matches } from "@/lib/search";
 import { isOpen, setStatus, useMe, useOrders } from "@/lib/store";
 import { OPEN_STATUSES, STATUSES, STATUS_LABEL, nextStatus, type Order, type OrderStatus } from "@/lib/types";
 
-type Filter = "open" | "all" | "internal" | OrderStatus;
+type Filter = "open" | "all" | "internal" | "exchange" | OrderStatus;
 type Sort = "due" | "newest" | "oldest" | "amount" | "customer" | "status";
 type View = { sort: Sort; layout: "cards" | "table"; notes: boolean; due: DueLevel | "" };
 const SORTS: { key: Sort; label: string }[] = [
@@ -63,9 +63,10 @@ export default function OrdersPage() {
       { f: "all", label: "All", n: real.length },
       ...STATUSES.filter((s) => count(s) > 0).map((s) => ({ f: s as Filter, label: STATUS_LABEL[s], n: count(s) })),
       ...(internal ? [{ f: "internal" as Filter, label: "Internal / test", n: internal }] : []),
+      { f: "exchange", label: "Exchanges", n: real.filter((o) => o.is_exchange).length },
     ];
     let base =
-      f === "internal" ? orders.filter((o) => o.is_internal) : f === "open" ? real.filter(isOpen) : f === "all" ? real : real.filter((o) => o.status === f);
+      f === "internal" ? orders.filter((o) => o.is_internal) : f === "exchange" ? real.filter((o) => o.is_exchange) : f === "open" ? real.filter(isOpen) : f === "all" ? real : real.filter((o) => o.status === f);
     base = base.filter((o) => matches(o, q));
     const due = new Map(base.map((o) => [o.id, dueInfo(o, rules)]));
     const openOnes = base.filter((o) => OPEN_STATUSES.includes(o.status));

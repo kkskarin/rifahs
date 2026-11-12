@@ -19,3 +19,4 @@ create table if not exists public.issue_updates (
 alter table public.issue_updates enable row level security;
 create policy "team reads issue updates" on public.issue_updates for select using (public.is_team_member());
 create policy "team adds issue updates" on public.issue_updates for insert with check (public.is_team_member());
+alter table public.orders add column if not exists is_exchange boolean not null default false;
