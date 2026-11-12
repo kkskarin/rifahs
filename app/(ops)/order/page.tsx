@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { mutate } from "swr";
-import { pushOrderToShopify } from "../actions";
+import { fulfilInShopify, pushOrderToShopify, pushSizeToShopify } from "../actions";
 import { safe } from "@/lib/safe";
 import EntryForm from "@/components/EntryForm";
 import OrderForm from "@/components/OrderForm";
@@ -27,6 +27,8 @@ export default function OrderPage() {
   const { data: people } = useTeam(true);
   const [note, setNote] = useState("");
   const [push, setPush] = useState<{ busy?: boolean; ok?: boolean; message?: string }>({});
+  const [sizeMsg, setSizeMsg] = useState<{ ok?: boolean; message?: string }>({});
+  const [ful, setFul] = useState<{ busy?: boolean; ok?: boolean; message?: string; notify?: boolean }>({});
 
   const o = orders?.find((x) => x.id === id);
   if (!orders) return <p className="empty">Loading…</p>;
@@ -105,6 +107,27 @@ export default function OrderPage() {
             {push.message && <span className={push.ok ? "success" : "error"}>{push.message}</span>}
           </p>
         )}
+        {!open && o.shopify_id && !o.shopify_fulfilled && (o.status === "dispatched" || o.status === "delivered") && (
+          <div style={{ marginTop: 16, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              className="btn small"
+              disabled={ful.busy}
+              onClick={async () => {
+                setFul({ ...ful, busy: true });
+                const r = (await safe(() => fulfilInShopify(o.id, Boolean(ful.notify)))) as { ok: boolean; message?: string };
+                await mutate("orders");
+                mutate(["events", o.id]);
+                setFul({ ...r, notify: ful.notify });
+              }}
+            >
+              {ful.busy ? "Updating…" : "Mark fulfilled in Shopify"}
+            </button>
+            <label className="checkbox">
+              <input type="checkbox" checked={Boolean(ful.notify)} onChange={(e) => setFul({ ...ful, notify: e.target.checked })} /> Email the customer the tracking details
+            </label>
+            {ful.message && <span className={ful.ok ? "success" : "error"}>{ful.message}</span>}
+          </div>
+        )}
         {open && (
           <>
             <h3 style={{ marginTop: 20, marginBottom: 0 }}>Dispatch</h3>
@@ -116,7 +139,7 @@ export default function OrderPage() {
       <div className="panel">
         <h3>Items &amp; sizes</h3>
         <p className="hint" style={{ marginTop: -6 }}>
-          Change a size here when the customer asks. It is used for stitching and stock from then on, and is kept when Shopify syncs.
+          Change a size here when the customer asks. It is used for stitching and stock from then on{o.shopify_id ? ", and the Shopify order is changed to the same size (no email to the customer)" : ""}.
         </p>
         <div className="master-list">
           {o.items.map((it, i) => (
@@ -138,7 +161,14 @@ export default function OrderPage() {
                     if (!me) return;
                     let v = e.target.value;
                     if (v === "__other") v = prompt("Size (e.g. 4XL, or custom measurements)") ?? "";
-                    if (v) await changeItemSize(me, o, i, v);
+                    if (!v || v === (it.size ?? "")) return;
+                    const r = await changeItemSize(me, o, i, v);
+                    if (r.ok && o.shopify_id) {
+                      setSizeMsg({ ok: true, message: "Updating Shopify…" });
+                      const s = (await safe(() => pushSizeToShopify(o.id, it.title, it.size ?? null, v))) as { ok: boolean; message?: string };
+                      setSizeMsg(s);
+                      mutate(["events", o.id]);
+                    } else setSizeMsg(r.ok ? {} : r);
                   }}
                   style={{ padding: "6px 8px" }}
                 >
@@ -155,6 +185,7 @@ export default function OrderPage() {
           ))}
           {!o.items.length && <p className="hint">No items recorded on this order.</p>}
         </div>
+        {sizeMsg.message && <p className={sizeMsg.ok ? "success" : "error"}>{sizeMsg.message}</p>}
       </div>
 
       {o.shopify_id ? <OrderForm key={o.updated_at} order={o} /> : <EntryForm key={o.updated_at} order={o} />}

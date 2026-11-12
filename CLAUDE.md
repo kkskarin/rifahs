@@ -12,5 +12,8 @@
 ## Stack
 Next.js (static pages; data loaded in the browser from Supabase with row-level security),
 Supabase project "Rifah's Kaleidoscope" (cqirofbbxoedbirijnva, Mumbai), Netlify hosting,
-Shopify sync is read-only, with ONE allowed write: creating a manual entry as a Shopify order
-(`createShopifyOrder`, at the user's request). Never edit, fulfil or cancel Shopify orders.
+Shopify: orders and stock are read by the sync. Allowed writes (each at the user's request, all in
+`lib/shopify.ts`): `createShopifyOrder` (manual entry → Shopify order), `updateOrderDetails`
+(customer email / shipping address), `changeLineSize` (order edit), `fulfillOrder` (dispatch; customer
+emailed only when the box is ticked). Never cancel or refund Shopify orders, never change Shopify stock
+or prices, and never send customer emails by default.

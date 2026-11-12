@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { memo, useState } from "react";
+import { mutate } from "swr";
+import { fulfilInShopify } from "@/app/(ops)/actions";
+import { safe } from "@/lib/safe";
 import { dueInfo, useDueRules } from "@/lib/due";
 import { itemsLine, money, shortDate } from "@/lib/format";
 import { dispatch, setStatus, useMe } from "@/lib/store";
@@ -191,6 +194,7 @@ export function DispatchForm({ o, onClose }: { o: Order; onClose?: () => void })
   const { data: me } = useMe();
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState<{ ok: boolean; message?: string } | null>(null);
+  const [fulfil, setFulfil] = useState(true);
   return (
     <form
       onSubmit={async (e) => {
@@ -200,6 +204,15 @@ export function DispatchForm({ o, onClose }: { o: Order; onClose?: () => void })
         const v = (k: string) => String(f.get(k) ?? "").trim() || null;
         setBusy(true);
         const r = await dispatch(me, o, { courier: v("courier"), tracking_number: v("tracking_number"), tracking_url: v("tracking_url") });
+        if (r.ok && o.shopify_id && f.get("fulfil") === "on") {
+          const s = (await safe(() => fulfilInShopify(o.id, f.get("notify") === "on"))) as { ok: boolean; message?: string };
+          mutate("orders");
+          mutate(["events", o.id]);
+          setBusy(false);
+          setState(s);
+          if (s.ok) onClose?.();
+          return;
+        }
         setBusy(false);
         setState(r);
         if (r.ok) onClose?.();
@@ -225,6 +238,16 @@ export function DispatchForm({ o, onClose }: { o: Order; onClose?: () => void })
           <option key={c} value={c} />
         ))}
       </datalist>
+      {o.shopify_id && !o.shopify_fulfilled && (
+        <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 12 }}>
+          <label className="checkbox">
+            <input type="checkbox" name="fulfil" checked={fulfil} onChange={(e) => setFulfil(e.target.checked)} /> Mark fulfilled in Shopify
+          </label>
+          <label className="checkbox" style={fulfil ? undefined : { opacity: 0.5 }}>
+            <input type="checkbox" name="notify" disabled={!fulfil} /> Email the customer the tracking details
+          </label>
+        </div>
+      )}
       {state && !state.ok && <p className="error">{state.message}</p>}
       <div className="form-actions">
         {onClose && (

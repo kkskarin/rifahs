@@ -1,7 +1,11 @@
 import "server-only";
 
-// Reads orders from Shopify. The ONLY write is createShopifyOrder(): a manual entry made in Core
-// is created as an order in Shopify, at the user's request. Nothing else is ever changed there.
+// Reads orders and stock from Shopify. Writes are limited to what the owner asked for:
+//  - createShopifyOrder(): a manual entry made in Core becomes a Shopify order
+//  - updateOrderDetails(): customer email, note and shipping address edited in Core
+//  - changeLineSize(): a size changed in Core (Shopify order edit)
+//  - fulfillOrder(): an order dispatched in Core is marked fulfilled, emailing the customer only if ticked
+// Never cancel or refund from here.
 
 const SHOP = process.env.SHOPIFY_STORE_DOMAIN ?? "xd1uww-uu.myshopify.com";
 const VERSION = process.env.SHOPIFY_API_VERSION ?? "2026-10";
@@ -338,4 +342,109 @@ export async function fetchStock(): Promise<ShopifyVariantStock[]> {
     after = data.products.pageInfo.endCursor;
   }
   return out;
+}
+
+// ── Which app is this, and what has Shopify actually allowed it to do? ──
+export async function appAccess() {
+  const data = await shopifyGraphQL<{ currentAppInstallation: { app: { title: string; handle: string }; accessScopes: { handle: string }[] } }>(
+    `{ currentAppInstallation { app { title handle } accessScopes { handle } } }`,
+  );
+  return { title: data.currentAppInstallation.app.title, handle: data.currentAppInstallation.app.handle, scopes: data.currentAppInstallation.accessScopes.map((s) => s.handle).sort() };
+}
+
+const gid = (legacyId: number | string) => `gid://shopify/Order/${legacyId}`;
+const userErrors = (errs: { message: string }[] | undefined) => {
+  if (errs?.length) throw new Error(errs.map((e) => e.message).join("; "));
+};
+
+// ── Edit: customer details ─────────────────────────────────────
+export async function updateOrderDetails(
+  legacyId: number,
+  d: { name: string; email: string | null; phone: string | null; address: Record<string, string | null> | null },
+) {
+  const [first, ...rest] = d.name.trim().split(/\s+/);
+  const a = d.address;
+  const india = !a?.country || /^(india|in)$/i.test(String(a.country).trim()) || a?.countryCodeV2 === "IN";
+  const stateCode = IN_STATES[String(a?.province ?? "").trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
+  const input: Record<string, unknown> = { id: gid(legacyId) };
+  if (d.email) input.email = d.email;
+  if (a?.address1 && a?.city) {
+    input.shippingAddress = {
+      firstName: first,
+      lastName: rest.join(" ") || first,
+      address1: a.address1,
+      ...(a.address2 ? { address2: a.address2 } : {}),
+      city: a.city,
+      zip: a.zip || undefined,
+      phone: d.phone || a.phone || undefined,
+      ...(india ? { countryCode: "IN" } : a.countryCodeV2 ? { countryCode: a.countryCodeV2 } : {}),
+      ...(india && stateCode ? { provinceCode: stateCode } : {}),
+    };
+  }
+  const r = await shopifyGraphQL<{ orderUpdate: { userErrors: { message: string }[] } }>(
+    `mutation($input: OrderInput!) { orderUpdate(input: $input) { userErrors { message } } }`,
+    { input },
+  );
+  userErrors(r.orderUpdate.userErrors);
+}
+
+// ── Edit: swap an item to another size ─────────────────────────
+export async function changeLineSize(legacyId: number, title: string, fromSize: string | null, toSize: string) {
+  const newVariant = await findVariant(title, toSize);
+  if (!newVariant) return { ok: false as const, message: `Shopify has no "${title}" in size ${toSize}, so the change is kept in Core only.` };
+
+  const begin = await shopifyGraphQL<{
+    orderEditBegin: {
+      userErrors: { message: string }[];
+      calculatedOrder: { id: string; lineItems: { nodes: { id: string; title: string; quantity: number; variant: { id: string; title: string } | null }[] } } | null;
+    };
+  }>(
+    `mutation($id: ID!) { orderEditBegin(id: $id) { userErrors { message } calculatedOrder { id lineItems(first: 50) { nodes { id title quantity variant { id title } } } } } }`,
+    { id: gid(legacyId) },
+  );
+  userErrors(begin.orderEditBegin.userErrors);
+  const calc = begin.orderEditBegin.calculatedOrder!;
+  const same = (t: string) => t.trim().toLowerCase() === title.trim().toLowerCase();
+  const lines = calc.lineItems.nodes.filter((l) => l.quantity > 0 && same(l.title));
+  const line = lines.find((l) => fromSize && l.variant?.title.split("/").some((p) => normSize(p) === normSize(fromSize))) ?? lines[0];
+  if (!line) return { ok: false as const, message: `Couldn't find "${title}" on the Shopify order, so the change is kept in Core only.` };
+  if (line.variant?.id === newVariant) return { ok: true as const, message: "Shopify already has that size." };
+
+  // Nothing changes in Shopify until the final commit; if any step fails the edit is simply dropped.
+  const add = await shopifyGraphQL<{ orderEditAddVariant: { userErrors: { message: string }[] } }>(
+    `mutation($id: ID!, $v: ID!, $q: Int!) { orderEditAddVariant(id: $id, variantId: $v, quantity: $q, allowDuplicates: true) { userErrors { message } } }`,
+    { id: calc.id, v: newVariant, q: line.quantity },
+  );
+  userErrors(add.orderEditAddVariant.userErrors);
+  const rm = await shopifyGraphQL<{ orderEditSetQuantity: { userErrors: { message: string }[] } }>(
+    `mutation($id: ID!, $l: ID!) { orderEditSetQuantity(id: $id, lineItemId: $l, quantity: 0) { userErrors { message } } }`,
+    { id: calc.id, l: line.id },
+  );
+  userErrors(rm.orderEditSetQuantity.userErrors);
+  const commit = await shopifyGraphQL<{ orderEditCommit: { userErrors: { message: string }[] } }>(
+    `mutation($id: ID!, $note: String) { orderEditCommit(id: $id, notifyCustomer: false, staffNote: $note) { userErrors { message } } }`,
+    { id: calc.id, note: `Size changed in Kaleidoscope Core: ${title} ${fromSize ?? "—"} → ${toSize}` },
+  );
+  userErrors(commit.orderEditCommit.userErrors);
+  return { ok: true as const, message: `Shopify order updated to size ${toSize}.` };
+}
+
+// ── Dispatch: mark fulfilled, with tracking ────────────────────
+export async function fulfillOrder(legacyId: number, t: { company?: string | null; number?: string | null; url?: string | null }, notifyCustomer: boolean) {
+  const fo = await shopifyGraphQL<{ order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } | null }>(
+    `query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status } } } }`,
+    { id: gid(legacyId) },
+  );
+  const open = fo.order?.fulfillmentOrders.nodes.filter((n) => ["OPEN", "IN_PROGRESS", "SCHEDULED"].includes(n.status)) ?? [];
+  if (!open.length) return { ok: true as const, message: "Shopify already shows this order as fulfilled." };
+  const trackingInfo: Record<string, string> = {};
+  if (t.company) trackingInfo.company = t.company;
+  if (t.number) trackingInfo.number = t.number;
+  if (t.url) trackingInfo.url = t.url;
+  const r = await shopifyGraphQL<{ fulfillmentCreate: { userErrors: { message: string }[] } }>(
+    `mutation($f: FulfillmentInput!) { fulfillmentCreate(fulfillment: $f) { userErrors { message } } }`,
+    { f: { lineItemsByFulfillmentOrder: open.map((n) => ({ fulfillmentOrderId: n.id })), notifyCustomer, ...(Object.keys(trackingInfo).length ? { trackingInfo } : {}) } },
+  );
+  userErrors(r.fulfillmentCreate.userErrors);
+  return { ok: true as const, message: notifyCustomer ? "Marked fulfilled in Shopify; the customer was emailed." : "Marked fulfilled in Shopify (no email sent)." };
 }

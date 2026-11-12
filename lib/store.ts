@@ -287,6 +287,7 @@ export type OrderInput = {
   channel?: string;
   order_number?: string | null;
   address1?: string | null;
+  address2?: string | null;
   city?: string | null;
   province?: string | null;
   zip?: string | null;
@@ -324,6 +325,21 @@ export async function saveOrder(me: Profile, existing: Order | null, input: Orde
         ? { address1: input.address1 || null, city: input.city || null, province: input.province || null, zip: input.zip || null, country: input.ship_country || "India" }
         : null;
     fields.financial_status = input.payment ?? "paid";
+  }
+  if (existing?.shopify_id && input.address1 !== undefined) {
+    // Shopify order: keep Shopify's address record and change only what was edited here.
+    fields.ship_city = input.city || null;
+    fields.ship_address = {
+      ...((existing.ship_address as Record<string, unknown> | null) ?? {}),
+      name: input.customer_name.trim(),
+      address1: input.address1 || null,
+      address2: input.address2 || null,
+      city: input.city || null,
+      province: input.province || null,
+      zip: input.zip || null,
+      phone: input.customer_phone,
+      ...(input.ship_country ? { country: input.ship_country } : {}),
+    };
   }
   if (existing && fields.status === "dispatched" && existing.status !== "dispatched") fields.dispatched_at = now();
 

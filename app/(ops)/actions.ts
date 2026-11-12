@@ -1,10 +1,11 @@
 "use server";
 
 // Only the jobs that need server-side secrets live here: adding/removing team members
-// (Supabase admin key), the Shopify sync and creating a manual order in Shopify (Shopify keys).
+// (Supabase admin key), the Shopify sync, and the few things Core writes to Shopify (Shopify keys):
+// a new manual order, customer details, a size change, and marking an order fulfilled.
 import { requireAdmin, requireMember } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { createShopifyOrder, shopifyConfigured } from "@/lib/shopify";
+import { changeLineSize, createShopifyOrder, fulfillOrder, shopifyConfigured, updateOrderDetails } from "@/lib/shopify";
 import { syncBudgetMs, syncRecent, syncStock } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
 import type { OrderItem, TeamRole } from "@/lib/types";
@@ -126,5 +127,69 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
     if (/access denied|write_orders|scope/i.test(m))
       return { ok: false, message: "Saved in Core, but Shopify refused: the Rifah's Ops app needs the write_orders permission (Dev Dashboard → app → Versions → add write_orders → Release, then approve on the store)." };
     return { ok: false, message: `Saved in Core, but Shopify refused: ${m.slice(0, 200)}` };
+  }
+}
+
+// ───────────────────────── Edits made in Core → Shopify ─────────────────────────
+// The change is always saved in Core first. If Shopify refuses, Core keeps it and says so.
+
+const NEEDS: Record<string, string> = {
+  details: "write_orders",
+  size: "write_order_edits (and read_products)",
+  fulfil: "write_merchant_managed_fulfillment_orders",
+};
+
+async function linkedOrder(orderId: string) {
+  const me = await requireMember();
+  const db = supabaseAdmin();
+  const { data: o } = await db.from("orders").select("*").eq("id", orderId).single();
+  return { me, db, o };
+}
+
+function refused(kind: keyof typeof NEEDS, e: unknown): ActionResult {
+  const m = (e as Error).message.replace(/^Shopify API error: /, "");
+  const hint = /access denied|scope|permission/i.test(m) ? ` The Rifah's Ops app needs the ${NEEDS[kind]} permission approved on the store.` : "";
+  return { ok: false, message: `Saved in Core, but Shopify refused: ${m.slice(0, 200)}.${hint}` };
+}
+
+/** Customer name, email, phone and shipping address as they now stand in Core. */
+export async function pushDetailsToShopify(orderId: string): Promise<ActionResult> {
+  const { me, db, o } = await linkedOrder(orderId);
+  if (!o?.shopify_id) return { ok: true };
+  if (!shopifyConfigured()) return { ok: false, message: "Saved in Core. Shopify isn't connected, so it wasn't updated there." };
+  try {
+    await updateOrderDetails(o.shopify_id, { name: o.customer_name, email: o.customer_email, phone: o.customer_phone, address: o.ship_address });
+    await db.from("order_events").insert({ order_id: orderId, kind: "shopify_sync", message: "Customer details updated in Shopify", actor: me.id });
+    return { ok: true, message: "Saved, and updated in Shopify." };
+  } catch (e) {
+    return refused("details", e);
+  }
+}
+
+export async function pushSizeToShopify(orderId: string, title: string, fromSize: string | null, toSize: string): Promise<ActionResult> {
+  const { me, db, o } = await linkedOrder(orderId);
+  if (!o?.shopify_id) return { ok: true };
+  if (!shopifyConfigured()) return { ok: false, message: "Size saved in Core. Shopify isn't connected, so it wasn't updated there." };
+  try {
+    const r = await changeLineSize(o.shopify_id, title, fromSize, toSize);
+    await db.from("order_events").insert({ order_id: orderId, kind: "shopify_sync", message: r.message, actor: me.id });
+    return { ok: r.ok, message: r.ok ? `Size saved. ${r.message}` : `Size saved in Core. ${r.message}` };
+  } catch (e) {
+    return refused("size", e);
+  }
+}
+
+/** Mark the Shopify order fulfilled with Core's courier and tracking. The customer is emailed only if asked. */
+export async function fulfilInShopify(orderId: string, notifyCustomer: boolean): Promise<ActionResult> {
+  const { me, db, o } = await linkedOrder(orderId);
+  if (!o?.shopify_id) return { ok: true };
+  if (!shopifyConfigured()) return { ok: false, message: "Dispatched in Core. Shopify isn't connected, so it wasn't marked fulfilled there." };
+  try {
+    const r = await fulfillOrder(o.shopify_id, { company: o.courier, number: o.tracking_number, url: o.tracking_url }, notifyCustomer);
+    await db.from("orders").update({ shopify_fulfilled: true }).eq("id", orderId);
+    await db.from("order_events").insert({ order_id: orderId, kind: "shopify_sync", message: r.message, actor: me.id });
+    return { ok: true, message: r.message };
+  } catch (e) {
+    return refused("fulfil", e);
   }
 }

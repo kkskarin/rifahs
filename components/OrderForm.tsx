@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { mutate } from "swr";
-import { pushOrderToShopify } from "@/app/(ops)/actions";
+import { pushDetailsToShopify, pushOrderToShopify } from "@/app/(ops)/actions";
 import { safe } from "@/lib/safe";
 import { itemsLine } from "@/lib/format";
 import { saveOrder, useMe } from "@/lib/store";
@@ -51,6 +51,7 @@ export default function OrderForm({ order }: { order?: Order }) {
           channel: v("channel"),
           order_number: n("order_number"),
           address1: n("address1"),
+          address2: n("address2"),
           city: n("city"),
           province: n("province"),
           zip: n("zip"),
@@ -66,6 +67,17 @@ export default function OrderForm({ order }: { order?: Order }) {
           }
           setBusy(false);
           return router.replace(`/order?id=${r.id}`);
+        }
+        if (r.ok && order?.shopify_id) {
+          // Customer details changed on a Shopify order: send the same change to Shopify.
+          const a = (order.ship_address ?? {}) as Record<string, string | null>;
+          const was = [order.customer_name, order.customer_email, order.customer_phone, a.address1, a.address2, a.city, a.province, a.zip, order.ship_country];
+          const is = [v("customer_name"), n("customer_email"), n("customer_phone"), n("address1"), n("address2"), n("city"), n("province"), n("zip"), n("ship_country")];
+          if (was.some((x, i) => (x ?? "") !== (is[i] ?? ""))) {
+            const s = (await safe(() => pushDetailsToShopify(order.id))) as { ok: boolean; message?: string };
+            setBusy(false);
+            return setState(s.message ? s : r);
+          }
         }
         setBusy(false);
         setState(r);
@@ -141,27 +153,6 @@ export default function OrderForm({ order }: { order?: Order }) {
                 <option value="pending">Pending / cash on delivery</option>
               </select>
             </label>
-            <label className="field full">
-              <span>Address</span>
-              <input name="address1" defaultValue={(order?.ship_address as Record<string, string> | null)?.address1 ?? ""} placeholder="House, street, area" />
-            </label>
-            <label className="field">
-              <span>City</span>
-              <input name="city" defaultValue={order?.ship_city ?? ""} />
-            </label>
-            <label className="field">
-              <span>State</span>
-              <input name="province" list="in-states" defaultValue={(order?.ship_address as Record<string, string> | null)?.province ?? ""} />
-              <datalist id="in-states">
-                {["Tamil Nadu", "Karnataka", "Kerala", "Andhra Pradesh", "Telangana", "Maharashtra", "Delhi", "Gujarat", "West Bengal", "Uttar Pradesh", "Rajasthan", "Punjab", "Haryana", "Madhya Pradesh", "Odisha", "Bihar", "Assam", "Goa", "Puducherry"].map((x) => (
-                  <option key={x} value={x} />
-                ))}
-              </datalist>
-            </label>
-            <label className="field">
-              <span>PIN code</span>
-              <input name="zip" inputMode="numeric" defaultValue={(order?.ship_address as Record<string, string> | null)?.zip ?? ""} />
-            </label>
             <label className="field">
               <span>Channel</span>
               <select name="channel" defaultValue={order?.channel ?? "Instagram"}>
@@ -173,6 +164,27 @@ export default function OrderForm({ order }: { order?: Order }) {
           </>
         )}
 
+          <label className="field full">
+            <span>Address</span>
+            <input name="address1" defaultValue={(order?.ship_address as Record<string, string> | null)?.address1 ?? ""} placeholder="House, street, area" />
+          </label>
+          <label className="field">
+            <span>City</span>
+            <input name="city" defaultValue={order?.ship_city ?? ""} />
+          </label>
+          <label className="field">
+            <span>State</span>
+            <input name="province" list="in-states" defaultValue={(order?.ship_address as Record<string, string> | null)?.province ?? ""} />
+            <datalist id="in-states">
+              {["Tamil Nadu", "Karnataka", "Kerala", "Andhra Pradesh", "Telangana", "Maharashtra", "Delhi", "Gujarat", "West Bengal", "Uttar Pradesh", "Rajasthan", "Punjab", "Haryana", "Madhya Pradesh", "Odisha", "Bihar", "Assam", "Goa", "Puducherry"].map((x) => (
+                <option key={x} value={x} />
+              ))}
+            </datalist>
+          </label>
+          <label className="field">
+            <span>PIN code</span>
+            <input name="zip" inputMode="numeric" defaultValue={(order?.ship_address as Record<string, string> | null)?.zip ?? ""} />
+          </label>
         <label className="field">
           <span>Promise date</span>
           <input name="promise_date" type="date" defaultValue={order?.promise_date ?? ""} />
@@ -221,6 +233,7 @@ export default function OrderForm({ order }: { order?: Order }) {
           <input type="checkbox" name="to_shopify" defaultChecked /> Also create this order in Shopify (no email is sent to the customer)
         </label>
       )}
+      {fromShopify && <p className="hint">Changes to the customer&apos;s name, email, phone or address are also made on the Shopify order. No email is sent to the customer.</p>}
       {state && <p className={state.ok ? "success" : "error"}>{state.message}</p>}
       {state?.id && (
         <p>

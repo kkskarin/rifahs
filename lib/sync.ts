@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase-server";
-import { fetchOrder, fetchOrdersPage, fetchStock, type ShopifyOrder } from "./shopify";
+import { appAccess, fetchOrder, fetchOrdersPage, fetchStock, type ShopifyOrder } from "./shopify";
 import { OPEN_STATUSES, type OrderItem, type OrderStatus } from "./types";
 
 // Sizes as they appear in variant titles, e.g. "M", "XXL", "M / Cotton", "Unstitched", "Free Size".
@@ -93,7 +93,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
   const shopifyOwned = {
     shopify_id: shopifyId,
     order_number: o.name,
-    customer_name: cleanName(o.customer?.displayName || o.shippingAddress?.name) || o.email || "Customer",
+    customer_name: cleanName(o.shippingAddress?.name || o.customer?.displayName) || o.email || "Customer",
     customer_email: o.email,
     customer_phone: o.phone || o.shippingAddress?.phone || null,
     items: mapItems(o),
@@ -164,7 +164,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
       const k = kept.findIndex((x) => x.title === it.title);
       if (k < 0) return it;
       const [mine] = kept.splice(k, 1);
-      return { ...it, size: mine.size, size_changed: true, original_size: it.size ?? mine.original_size ?? null };
+      return { ...it, size: mine.size, size_changed: true, original_size: it.size && it.size !== mine.size ? it.size : (mine.original_size ?? null) };
     });
   }
   // Never un-set express that the team flagged by hand.
@@ -289,10 +289,14 @@ export async function syncStock() {
     return { ok: true as const, variants: rows.length };
   } catch (e) {
     const m = (e as Error).message;
-    const needsScope = /access denied|read_products|scope/i.test(m);
-    const message = needsScope
-      ? "Shopify hasn't given this app permission to read products. Add read_products (and read_inventory) to the Rifah's Ops app in the Dev Dashboard."
-      : m.slice(0, 200);
+    // Say exactly which app Core is connected as and what Shopify has granted it, so a refusal can be traced.
+    let who = "";
+    try {
+      const a = await appAccess();
+      who = ` Core is connected as the Shopify app "${a.title}" (${a.handle}). Permissions Shopify has granted it on this store: ${a.scopes.join(", ") || "none"}.`;
+      if (!a.scopes.includes("read_products")) who += " read_products is not among them: open the app from Shopify admin → Settings → Apps to approve its new permissions, or check that the keys saved in Netlify belong to this app.";
+    } catch {}
+    const message = `Shopify said: ${m.replace(/^Shopify API error: /, "").slice(0, 220)}.${who}`;
     await db.from("sync_state").upsert({ key: "shopify_stock", value: { ok: false, message }, updated_at: now });
     return { ok: false as const, message };
   }

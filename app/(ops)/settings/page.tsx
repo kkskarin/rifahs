@@ -57,8 +57,10 @@ export default function SettingsPage() {
         </tbody>
       </table>
       <p className="hint">
-        Core reads orders from Shopify. The only thing it ever writes is a <b>new manual order</b> when you add an entry here
-        and tick “Also create this order in Shopify” — it never edits or fulfils existing Shopify orders. New and updated
+        Core reads orders and stock from Shopify. It writes to Shopify only when you do one of these here: add a{" "}
+        <b>new manual order</b> (with “Also create this order in Shopify” ticked), edit a <b>customer&apos;s details or address</b>,
+        change a <b>size</b>, or <b>dispatch</b> an order (marked fulfilled with the tracking number; the customer is emailed
+        only if you tick that box). It never cancels or refunds, and never changes Shopify stock or prices. New and updated
         orders are pulled in automatically every 10 minutes; press Sync to pull them now. Your team&apos;s statuses and notes
         are never overwritten.
       </p>
