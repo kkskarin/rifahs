@@ -60,7 +60,11 @@ export async function shopifyGraphQL<T>(query: string, variables: Record<string,
         await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
         continue;
       }
-      throw new Error(`Shopify API error: ${json.errors?.map((e) => e.message).join("; ") ?? res.status}`);
+      const msg = json.errors?.map((e) => e.message).join("; ") ?? String(res.status);
+      // A permission was refused: forget the saved access token, so the next try asks Shopify for a
+      // fresh one that carries any permissions added since.
+      if (/access denied|access scope/i.test(msg)) cached = null;
+      throw new Error(`Shopify API error: ${msg}`);
     }
     return json.data as T;
   }
