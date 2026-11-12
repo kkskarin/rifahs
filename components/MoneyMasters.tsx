@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { categoryTree, deleteCategory, deleteVendor, saveCategory, saveVendor, useExpenseCategories, useVendors } from "@/lib/money";
 import { useExpenses } from "@/lib/store";
-import type { ExpenseCategory, Vendor } from "@/lib/types";
+import { categoryLabel } from "@/lib/money";
+import { VENDOR_TYPES, type ExpenseCategory, type Vendor } from "@/lib/types";
 
 function InlineAdd({ placeholder, label, onAdd }: { placeholder: string; label: string; onAdd: (name: string) => Promise<{ ok: boolean; message?: string }> }) {
   const [v, setV] = useState("");
@@ -124,13 +125,50 @@ export function CategoryMaster({ canEdit }: { canEdit: boolean }) {
   );
 }
 
+/** Type + default expense category fields, shared by the vendor master and the quick-add on Expenses. */
+export function VendorLinkFields({ vendor }: { vendor?: Vendor }) {
+  const { data: cats } = useExpenseCategories();
+  const tree = categoryTree(cats);
+  return (
+    <>
+      <label className="field">
+        <span>Vendor type</span>
+        <input name="vendor_type" list="vendor-types" defaultValue={vendor?.vendor_type ?? ""} placeholder="e.g. Stitching unit" />
+        <datalist id="vendor-types">
+          {VENDOR_TYPES.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      </label>
+      <label className="field">
+        <span>Default expense category</span>
+        <select name="default_category_id" defaultValue={vendor?.default_category_id ?? ""}>
+          <option value="">None</option>
+          {tree.map((c) => [
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>,
+            ...c.children.map((x) => (
+              <option key={x.id} value={x.id}>
+                {"\u00a0\u00a0› "}
+                {x.name}
+              </option>
+            )),
+          ])}
+        </select>
+      </label>
+    </>
+  );
+}
+
 export function VendorMaster({ canEdit }: { canEdit: boolean }) {
+  const { data: cats } = useExpenseCategories();
   const { data: vendors } = useVendors();
   const { data: expenses } = useExpenses(canEdit);
   const [editing, setEditing] = useState<Vendor | "new" | null>(null);
   const [q, setQ] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  const list = (vendors ?? []).filter((v) => !q.trim() || [v.name, v.phone, v.notes].join(" ").toLowerCase().includes(q.trim().toLowerCase()));
+  const list = (vendors ?? []).filter((v) => !q.trim() || [v.name, v.phone, v.notes, v.vendor_type].join(" ").toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
     <>
@@ -156,6 +194,8 @@ export function VendorMaster({ canEdit }: { canEdit: boolean }) {
               name: String(f.get("name") ?? ""),
               phone: String(f.get("phone") ?? ""),
               notes: String(f.get("notes") ?? ""),
+              vendor_type: String(f.get("vendor_type") ?? ""),
+              default_category_id: String(f.get("default_category_id") ?? "") || null,
             });
             setErr(r.ok ? null : (r.message ?? null));
             if (r.ok) setEditing(null);
@@ -171,6 +211,7 @@ export function VendorMaster({ canEdit }: { canEdit: boolean }) {
               <span>Phone</span>
               <input name="phone" type="tel" defaultValue={editing === "new" ? "" : editing.phone} />
             </label>
+            <VendorLinkFields vendor={editing === "new" ? undefined : editing} />
             <label className="field full">
               <span>Notes</span>
               <input name="notes" defaultValue={editing === "new" ? "" : editing.notes} placeholder="What they supply, GST no., payment terms…" />
@@ -191,6 +232,8 @@ export function VendorMaster({ canEdit }: { canEdit: boolean }) {
             <thead>
               <tr>
                 <th>Vendor</th>
+                <th>Type</th>
+                <th>Default category</th>
                 <th>Phone</th>
                 <th>Notes</th>
                 <th className="n">Paid so far</th>
@@ -212,6 +255,8 @@ export function VendorMaster({ canEdit }: { canEdit: boolean }) {
                   return (
                     <tr key={v.id}>
                       <td className="stack-title">{v.name}</td>
+                      <td data-label="Type">{v.vendor_type}</td>
+                      <td data-label="Default category">{v.default_category_id ? categoryLabel(cats, v.default_category_id, "") : ""}</td>
                       <td data-label="Phone">{v.phone}</td>
                       <td className="hint" data-label="Notes">
                         {v.notes}

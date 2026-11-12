@@ -26,3 +26,5 @@ create policy "team reads vendors" on public.vendors for select using (public.is
 create policy "admins add vendors" on public.vendors for insert with check (public.is_team_admin());
 create policy "admins edit vendors" on public.vendors for update using (public.is_team_admin());
 create policy "admins delete vendors" on public.vendors for delete using (public.is_team_admin());
+alter table public.vendors add column if not exists vendor_type text not null default '';
+alter table public.vendors add column if not exists default_category_id uuid references public.expense_categories (id) on delete set null;

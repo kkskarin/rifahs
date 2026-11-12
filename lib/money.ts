@@ -25,7 +25,7 @@ export function useVendors() {
   return useSWR<Vendor[]>(
     "vendors",
     async () => {
-      const { data, error } = await sb().from("vendors").select("id, name, phone, notes").order("name");
+      const { data, error } = await sb().from("vendors").select("id, name, phone, notes, vendor_type, default_category_id").order("name");
       if (error) throw error;
       return (data ?? []) as Vendor[];
     },
@@ -72,12 +72,27 @@ export async function deleteCategory(id: string): Promise<Result> {
   return error ? { ok: false, message: friendly(error.message, "it has sub-categories or expenses recorded against it") } : { ok: true };
 }
 
-export async function saveVendor(input: { id?: string; name: string; phone: string; notes: string }): Promise<Result> {
-  const fields = { name: input.name.trim(), phone: input.phone.trim(), notes: input.notes.trim() };
+export async function saveVendor(input: {
+  id?: string;
+  name: string;
+  phone?: string;
+  notes?: string;
+  vendor_type?: string;
+  default_category_id?: string | null;
+}): Promise<Result & { id?: string }> {
+  const fields = {
+    name: input.name.trim(),
+    phone: (input.phone ?? "").trim(),
+    notes: (input.notes ?? "").trim(),
+    vendor_type: (input.vendor_type ?? "").trim(),
+    default_category_id: input.default_category_id || null,
+  };
   if (!fields.name) return { ok: false, message: "Enter the vendor's name" };
-  const { error } = input.id ? await sb().from("vendors").update(fields).eq("id", input.id) : await sb().from("vendors").insert(fields);
-  mutate("vendors");
-  return error ? { ok: false, message: friendly(error.message, "") } : { ok: true };
+  const { data, error } = input.id
+    ? await sb().from("vendors").update(fields).eq("id", input.id).select("id").single()
+    : await sb().from("vendors").insert(fields).select("id").single();
+  await mutate("vendors");
+  return error ? { ok: false, message: friendly(error.message, "") } : { ok: true, id: data?.id };
 }
 
 export async function deleteVendor(id: string): Promise<Result> {
@@ -90,17 +105,18 @@ export async function addExpense(
   me: Profile,
   cats: ExpenseCategory[],
   vendors: Vendor[],
-  input: { amount: string; category_id: string; vendor: string; spent_on: string; note: string },
+  input: { amount: string; category_id: string; vendor: string; vendor_id?: string; spent_on: string; note: string },
 ): Promise<Result> {
   const amount = Number(input.amount.replace(/[₹,\s]/g, ""));
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Enter an amount" };
   if (!input.category_id) return { ok: false, message: "Choose a category" };
 
   // Vendor lookup: pick an existing one by name, or add a new vendor to the master on the fly.
-  const vendorName = input.vendor.trim();
-  let vendorId: string | null = null;
+  const picked = input.vendor_id ? vendors.find((v) => v.id === input.vendor_id) : undefined;
+  const vendorName = picked?.name ?? input.vendor.trim();
+  let vendorId: string | null = picked?.id ?? null;
   let added = "";
-  if (vendorName) {
+  if (!picked && vendorName) {
     const hit = vendors.find((v) => v.name.toLowerCase() === vendorName.toLowerCase());
     if (hit) vendorId = hit.id;
     else {

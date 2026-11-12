@@ -137,7 +137,8 @@ export type Expense = {
   vendor_id: string | null;
 };
 export type ExpenseCategory = { id: string; name: string; parent_id: string | null; sort: number };
-export type Vendor = { id: string; name: string; phone: string; notes: string };
+export type Vendor = { id: string; name: string; phone: string; notes: string; vendor_type: string; default_category_id: string | null };
+export const VENDOR_TYPES = ["Fabric supplier", "Printer", "Stitching unit", "Laces & trims supplier", "Courier / transport", "Marketing agency", "Influencer", "Photographer", "Software", "Other"];
 
 export const ISSUE_KINDS = ["Courier", "Delayed", "Damaged", "Wrong item", "Return", "Exchange", "Payment", "Other"];
 export const EXPENSE_CATEGORIES = [

@@ -588,3 +588,6 @@ table.status-table td a { color: var(--wine); font-weight: 600; }
 }
 table.status-table td a.issue-tag, a.issue-tag { color: #fff; font-weight: 600; }
 @media (min-width: 901px) { table.t .due { white-space: nowrap; } }
+
+.quick-add { margin-top: 18px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: #fffdf5; }
+.quick-add h3 { margin-bottom: 12px; }

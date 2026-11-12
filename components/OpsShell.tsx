@@ -14,6 +14,7 @@ export const HEADERS: Header[] = [
   { label: "Order Status", href: "/status", match: ["/status"] },
   { label: "Purchase", href: "/purchase", match: ["/purchase"] },
   { label: "Inventory", href: "/inventory", match: ["/inventory"] },
+  { label: "Expenses", href: "/expenses", match: ["/expenses"], adminOnly: true },
   { label: "Disputes", href: "/disputes", match: ["/disputes"] },
   { label: "Masters", href: "/masters", match: ["/masters"] },
   { label: "Reports", href: "/reports", match: ["/reports"], adminOnly: true },
