@@ -1,7 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "./supabase-server";
-import { renderEmail, type EmailTemplate } from "./email-render";
+import { firstNameFrom, renderEmail, type EmailTemplate } from "./email-render";
 import { sendMail } from "./mailer";
 import type { TeamRole } from "./types";
 
@@ -53,8 +53,8 @@ export async function issueLink(opts: {
     const msg = renderEmail(
       tpl as EmailTemplate,
       {
-        first_name: opts.fullName.split(" ")[0] || "there",
-        name: opts.fullName,
+        first_name: firstNameFrom(opts.fullName, opts.email),
+        name: opts.fullName || firstNameFrom(opts.fullName, opts.email),
         email: opts.email,
         role: opts.role ? ROLE_LABEL[opts.role] : "",
         inviter: opts.inviterName,

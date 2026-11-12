@@ -133,28 +133,26 @@ export default function InventoryPage() {
           <p className="hint" style={{ marginTop: -6 }}>
             Open orders for designs that aren&apos;t tracked here yet. Add them, or add the name as another spelling of an existing design.
           </p>
-          <table className="t">
-            <tbody>
-              {untracked.map((u) => (
-                <tr key={u.title}>
-                  <td>{u.title}</td>
-                  <td className="n">{u.qty} waiting</td>
-                  <td className="hint">
-                    {u.orders.map((o) => (
-                      <Link key={o.id} href={`/order?id=${o.id}`} className="link" style={{ marginRight: 8 }}>
-                        {o.order_number ?? o.customer_name}
-                      </Link>
-                    ))}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button className="link" onClick={() => setAdding(u.title)}>
-                      Add
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="untracked">
+            {untracked.map((u) => (
+              <div key={u.title} className="untracked-row">
+                <div className="untracked-head">
+                  <b>{u.title}</b>
+                  <span className="meta">{u.qty} waiting</span>
+                  <button className="link" onClick={() => setAdding(u.title)}>
+                    Add to inventory
+                  </button>
+                </div>
+                <div className="link-row">
+                  {u.orders.map((o) => (
+                    <Link key={o.id} href={`/order?id=${o.id}`} className="link">
+                      {o.order_number ?? o.customer_name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </>
@@ -305,13 +303,13 @@ function Details({ p, d }: { p: Product; d?: Demand }) {
         <b>Open orders for this design</b>
       </p>
       {orders.length ? (
-        <p>
+        <div className="link-row">
           {orders.map((o) => (
-            <Link key={o.id} href={`/order?id=${o.id}`} className="link" style={{ marginRight: 10 }}>
+            <Link key={o.id} href={`/order?id=${o.id}`} className="link">
               {o.order_number} {o.customer_name.split(" ")[0]} ({o.status})
             </Link>
           ))}
-        </p>
+        </div>
       ) : (
         <p className="hint">None.</p>
       )}

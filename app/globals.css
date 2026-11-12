@@ -33,6 +33,9 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* Never let one wide element slide the whole page sideways on a phone. */
+body { overflow-x: clip; }
+.page, .panel, .card { min-width: 0; overflow-wrap: anywhere; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -373,3 +376,13 @@ button.chip { cursor: pointer; font: inherit; font-size: 13px; }
 .tpl-inbox { display: grid; gap: 2px; padding: 12px 16px; border-bottom: 1px solid #eee; font-size: 13px; background: #fafafa; color: #333; }
 .tpl-inbox span { color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tpl-preview iframe { width: 100%; height: min(78vh, 900px); border: 0; display: block; background: #fff; }
+
+.link-row { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 0 10px; }
+.untracked { display: grid; gap: 0; }
+.untracked-row { padding: 12px 0; border-top: 1px solid var(--line); }
+.untracked-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.untracked-head .link { margin-left: auto; }
+.untracked .link-row { margin: 6px 0 0; }
+.name-edit { border: 1px solid transparent; background: transparent; padding: 4px 6px; margin-left: -6px; border-radius: 4px; min-width: 9ch; }
+.name-edit:hover { border-color: var(--line-strong); }
+.name-edit:focus { border-color: var(--wine); background: #fffdf5; outline: 0; }

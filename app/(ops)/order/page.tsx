@@ -110,14 +110,14 @@ export default function OrderPage() {
           <button className="btn small">Add</button>
         </form>
         {orderIssues.length ? (
-          <p className="hint">
-            Issues:{" "}
+          <div className="link-row hint">
+            <span>Issues:</span>
             {orderIssues.map((i) => (
-              <Link key={i.id} className="link" href="/issues" style={{ marginRight: 10 }}>
+              <Link key={i.id} className="link" href="/issues">
                 {i.title} ({i.status})
               </Link>
             ))}
-          </p>
+          </div>
         ) : null}
         <ul className="timeline">
           {(events ?? []).map((e) => (

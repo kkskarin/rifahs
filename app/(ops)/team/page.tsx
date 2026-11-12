@@ -164,7 +164,23 @@ function Row({ p, me, pending, owner, onLink }: { p: Profile; me: Profile; pendi
 
   return (
     <tr style={{ opacity: p.active ? 1 : 0.5 }}>
-      <td>{p.full_name || "—"}</td>
+      <td>
+        <input
+          className="name-edit"
+          aria-label="Name"
+          defaultValue={p.full_name}
+          placeholder="Add name"
+          onBlur={async (e) => {
+            const v = e.currentTarget.value.trim();
+            if (v === p.full_name) return;
+            const { error } = await sb().from("profiles").update({ full_name: v }).eq("id", p.id);
+            setErr(error ? error.message : null);
+            mutate("team");
+            if (p.id === me.id) mutate("me");
+          }}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        />
+      </td>
       <td>{p.email}</td>
       <td>
         {canEdit && p.active ? (

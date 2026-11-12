@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { siteUrl } from "@/lib/site";
 import { hashToken, issueLink, ROLE_LABEL } from "@/lib/links";
-import { renderEmail, SAMPLE_VARS, type EmailTemplate } from "@/lib/email-render";
+import { firstNameFrom, renderEmail, SAMPLE_VARS, type EmailTemplate } from "@/lib/email-render";
 import { sendMail } from "@/lib/mailer";
 import type { TeamRole } from "@/lib/types";
 
@@ -164,7 +164,7 @@ export async function sendTestEmail(t: EmailTemplate): Promise<Result> {
     return { ok: false, message: (e as Error).message };
   }
   const site = await siteUrl();
-  const msg = renderEmail(t, { ...SAMPLE_VARS, first_name: (me.full_name || "there").split(" ")[0], name: me.full_name, email: me.email }, `${site}/join?t=sample`, site);
+  const msg = renderEmail(t, { ...SAMPLE_VARS, first_name: firstNameFrom(me.full_name, me.email), name: me.full_name || firstNameFrom(me.full_name, me.email), email: me.email }, `${site}/join?t=sample`, site);
   const r = await sendMail(me.email, { ...msg, subject: `[Test] ${msg.subject}` });
   return { ok: r.sent, message: r.status };
 }
