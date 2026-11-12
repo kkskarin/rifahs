@@ -153,3 +153,49 @@ export async function saveProduct(
   void me;
   return { ok: true as const };
 }
+
+export type ShopStock = { variant_id: number; product_id: number; product_title: string; variant_title: string; product_status: string; quantity: number | null };
+
+/** Shopify's own available quantities (read-only copy, refreshed with every sync). */
+export function useShopifyStock() {
+  return useSWR<ShopStock[]>(
+    "shopify-stock",
+    async () => {
+      const { data, error } = await sb().from("shopify_stock").select("variant_id, product_id, product_title, variant_title, product_status, quantity").limit(5000);
+      if (error) throw error;
+      return (data ?? []) as ShopStock[];
+    },
+    { revalidateOnFocus: true, dedupingInterval: 10000, keepPreviousData: true },
+  );
+}
+
+const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL", "XXXL", "UNSTITCHED"];
+const sizeRank = (t: string) => {
+  const i = SIZE_ORDER.indexOf(t.trim().toUpperCase());
+  return i < 0 ? 99 : i;
+};
+
+/** Group Shopify's stock by Core design (matched on name and other spellings). */
+export function shopifyByProduct(products: Product[] | undefined, stock: ShopStock[] | undefined) {
+  const keyToId = new Map<string, string>();
+  for (const p of products ?? []) for (const n of [p.name, ...p.aliases]) keyToId.set(normDesign(n), p.id);
+  const byId = new Map<string, { sizes: { label: string; qty: number | null }[]; total: number; live: boolean }>();
+  const unmatched = new Map<string, { title: string; total: number; status: string }>();
+  for (const s of stock ?? []) {
+    const id = keyToId.get(normDesign(s.product_title));
+    const qty = s.quantity ?? 0;
+    if (!id) {
+      const u = unmatched.get(s.product_title) ?? { title: s.product_title, total: 0, status: s.product_status };
+      u.total += Math.max(qty, 0);
+      unmatched.set(s.product_title, u);
+      continue;
+    }
+    const g = byId.get(id) ?? { sizes: [], total: 0, live: false };
+    g.sizes.push({ label: s.variant_title.split("/")[0].trim() || "One size", qty: s.quantity });
+    g.total += Math.max(qty, 0);
+    g.live = g.live || s.product_status === "active";
+    byId.set(id, g);
+  }
+  for (const g of byId.values()) g.sizes.sort((a, b) => sizeRank(a.label) - sizeRank(b.label));
+  return { byId, unmatched: [...unmatched.values()].filter((u) => u.status === "active").sort((a, b) => a.title.localeCompare(b.title)) };
+}

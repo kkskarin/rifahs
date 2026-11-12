@@ -158,11 +158,16 @@ export function useSyncState(enabled: boolean) {
   return useSWR(
     enabled ? "sync" : null,
     async () => {
-      const [{ data: state }, { count }] = await Promise.all([
+      const [{ data: state }, { count }, { data: stock }] = await Promise.all([
         sb().from("sync_state").select("value, updated_at").eq("key", "shopify_orders").maybeSingle(),
         sb().from("orders").select("id", { count: "exact", head: true }).not("shopify_id", "is", null),
+        sb().from("sync_state").select("value, updated_at").eq("key", "shopify_stock").maybeSingle(),
       ]);
-      return { updatedAt: (state?.updated_at as string | undefined) ?? null, synced: count ?? 0 };
+      return {
+        updatedAt: (state?.updated_at as string | undefined) ?? null,
+        synced: count ?? 0,
+        stock: stock ? { ...(stock.value as { ok: boolean; variants?: number; message?: string }), at: stock.updated_at as string } : null,
+      };
     },
     swrOpts,
   );

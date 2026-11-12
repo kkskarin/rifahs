@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase-server";
-import { fetchOrder, fetchOrdersPage, type ShopifyOrder } from "./shopify";
+import { fetchOrder, fetchOrdersPage, fetchStock, type ShopifyOrder } from "./shopify";
 import { OPEN_STATUSES, type OrderItem, type OrderStatus } from "./types";
 
 // Sizes as they appear in variant titles, e.g. "M", "XXL", "M / Cotton", "Unstitched", "Free Size".
@@ -260,4 +260,39 @@ export async function syncRecent(budgetMs = syncBudgetMs()) {
 
   await save(done ? { since: runStartedAt, cursor: null } : { since, cursor, runStartedAt });
   return { created, updated, done };
+}
+
+/** Copy Shopify's available quantities into Core (read-only). Records the outcome so the app can show it. */
+export async function syncStock() {
+  const db = supabaseAdmin();
+  const now = new Date().toISOString();
+  try {
+    const rows = await fetchStock();
+    if (rows.length) {
+      const { error } = await db.from("shopify_stock").upsert(
+        rows.map((r) => ({
+          variant_id: r.variantId,
+          product_id: r.productId,
+          product_title: r.productTitle,
+          variant_title: r.variantTitle,
+          product_status: r.status.toLowerCase(),
+          quantity: r.quantity,
+          synced_at: now,
+        })),
+      );
+      if (error) throw error;
+      // Variants deleted in Shopify drop out of the copy.
+      await db.from("shopify_stock").delete().lt("synced_at", now);
+    }
+    await db.from("sync_state").upsert({ key: "shopify_stock", value: { ok: true, variants: rows.length }, updated_at: now });
+    return { ok: true as const, variants: rows.length };
+  } catch (e) {
+    const m = (e as Error).message;
+    const needsScope = /access denied|read_products|scope/i.test(m);
+    const message = needsScope
+      ? "Shopify hasn't given this app permission to read products. Add read_products (and read_inventory) to the Rifah's Ops app in the Dev Dashboard."
+      : m.slice(0, 200);
+    await db.from("sync_state").upsert({ key: "shopify_stock", value: { ok: false, message }, updated_at: now });
+    return { ok: false as const, message };
+  }
 }

@@ -42,6 +42,18 @@ export default function SettingsPage() {
             <td>Last sync</td>
             <td>{sync ? (sync.updatedAt ? dateTime(sync.updatedAt) : "Never") : "…"}</td>
           </tr>
+          <tr>
+            <td>Shopify stock</td>
+            <td className={sync?.stock && !sync.stock.ok ? "error" : undefined}>
+              {!sync
+                ? "…"
+                : !sync.stock
+                  ? "Not read yet — press Sync"
+                  : sync.stock.ok
+                    ? `${sync.stock.variants} sizes read · ${dateTime(sync.stock.at)}`
+                    : sync.stock.message}
+            </td>
+          </tr>
         </tbody>
       </table>
       <p className="hint">

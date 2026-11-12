@@ -5,7 +5,7 @@
 import { requireAdmin, requireMember } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { createShopifyOrder, shopifyConfigured } from "@/lib/shopify";
-import { syncBudgetMs, syncRecent } from "@/lib/sync";
+import { syncBudgetMs, syncRecent, syncStock } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
 import type { OrderItem, TeamRole } from "@/lib/types";
 
@@ -62,9 +62,12 @@ export async function syncShopifyNow(): Promise<ActionResult> {
   if (!shopifyConfigured()) return { ok: false, message: "Shopify credentials aren't set yet" };
   try {
     const r = await syncRecent(syncBudgetMs());
-      return {
+    const stock = await syncStock();
+    return {
       ok: true,
-      message: `${r.created} new, ${r.updated} updated${r.done ? "" : " — more to fetch, press again"}`,
+      message:
+        `Orders: ${r.created} new, ${r.updated} updated${r.done ? "" : " — more to fetch, press again"}. ` +
+        (stock.ok ? `Stock: ${stock.variants} sizes read from Shopify.` : `Stock not read: ${stock.message}`),
     };
   } catch (e) {
     return { ok: false, message: (e as Error).message };

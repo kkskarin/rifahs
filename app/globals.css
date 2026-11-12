@@ -655,3 +655,8 @@ html[data-theme="dark"] table.queue th, html[data-theme="dark"] .queue-item td {
 .login .box input, .login .box .btn { min-width: 0; max-width: 100%; }
 html[data-font="large"] .login, html[data-font="xlarge"] .login { padding: 14px; min-height: calc(100vh / 1.22); }
 .who-block .avatar-initials { color: #fff; font-size: 16px; word-break: normal; }
+
+.shop-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin-top: 10px; font-size: 13.5px; }
+.shop-size { border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+.shop-size b { font-weight: 600; }
+.shop-size.zero { color: var(--faint); border-style: dashed; }

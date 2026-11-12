@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { dateTime } from "@/lib/format";
 import ProductForm from "@/components/ProductForm";
-import { adjust, demandByProduct, useMoves, useProducts, type Demand } from "@/lib/inventory";
+import { adjust, demandByProduct, shopifyByProduct, useMoves, useProducts, useShopifyStock, type Demand } from "@/lib/inventory";
 import { useOrders, useTeam } from "@/lib/store";
 import { STOCK_LABEL, type Product, type StockField } from "@/lib/types";
 
-type Filter = "attention" | "all" | "Current" | "New" | "accessories" | "stitched";
+type Filter = "attention" | "all" | "Current" | "New" | "accessories" | "stitched" | "oversold";
+type Shop = { sizes: { label: string; qty: number | null }[]; total: number; live: boolean };
 const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Free size"];
 
 export default function InventoryPage() {
@@ -19,6 +20,13 @@ export default function InventoryPage() {
   const [adding, setAdding] = useState<string | null>(null); // prefilled name, "" = blank
 
   const { demand, untracked } = useMemo(() => demandByProduct(products, orders), [products, orders]);
+  const { data: stock } = useShopifyStock();
+  const shop = useMemo(() => shopifyByProduct(products, stock), [products, stock]);
+  // Shopify is offering more than Core holds (fabric in stock + ready pieces): risk of selling what can't be made yet.
+  const oversold = (p: Product) => {
+    const g = shop.byId.get(p.id);
+    return g && g.live ? Math.max(g.total - (p.in_stock + p.stitched.reduce((a, r) => a + r.qty, 0)), 0) : 0;
+  };
 
   const status = (p: Product) => {
     const d = demand.get(p.id);
@@ -38,11 +46,12 @@ export default function InventoryPage() {
         if (filter === "Current" || filter === "New") return p.collection === filter && p.category === "Suit set";
         if (filter === "accessories") return p.category !== "Suit set";
         if (filter === "stitched") return p.stitched.some((r) => r.qty > 0);
+        if (filter === "oversold") return oversold(p) > 0;
         return true;
       })
       .sort((a, b) => status(b).short - status(a).short || a.name.localeCompare(b.name));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, demand, filter, q]);
+  }, [products, demand, filter, q, shop]);
 
   const totals = useMemo(() => {
     const ps = (products ?? []).filter((p) => p.active);
@@ -63,6 +72,7 @@ export default function InventoryPage() {
     { f: "New", label: "New collection" },
     { f: "accessories", label: "Dupattas & pants" },
     { f: "stitched", label: "Ready stitched", n: totals.ready },
+    ...(stock?.length ? [{ f: "oversold" as Filter, label: "Shopify shows more than we hold", n: (products ?? []).filter((p) => p.active && oversold(p) > 0).length }] : []),
   ];
 
   if (error) return <p className="error">Couldn&apos;t load inventory: {String(error.message ?? error)}</p>;
@@ -122,11 +132,38 @@ export default function InventoryPage() {
       ) : (
         <div className="list inv-list">
           {list.map((p) => (
-            <ProductCard key={p.id} p={p} {...status(p)} />
+            <ProductCard key={p.id} p={p} {...status(p)} shop={shop.byId.get(p.id)} over={oversold(p)} hasShopify={Boolean(stock?.length)} />
           ))}
         </div>
       )}
 
+      {stock && !stock.length && (
+        <p className="hint" style={{ marginTop: 18 }}>
+          Shopify stock hasn&apos;t been read yet. Go to ☰ → Settings → Shopify and press Sync orders now; if it reports a missing
+          permission, add read_products to the Rifah&apos;s Ops app in Shopify.
+        </p>
+      )}
+      {shop.unmatched.length > 0 && (
+        <div className="panel" style={{ marginTop: 22 }}>
+          <h3>On Shopify, but not in inventory</h3>
+          <p className="hint" style={{ marginTop: -6 }}>
+            Live Shopify products that don&apos;t match any design here. Add them, or add the Shopify name as another spelling of an existing design.
+          </p>
+          <div className="untracked">
+            {shop.unmatched.map((u) => (
+              <div key={u.title} className="untracked-row">
+                <div className="untracked-head">
+                  <b>{u.title}</b>
+                  <span className="meta">{u.total} available on Shopify</span>
+                  <button className="link" onClick={() => setAdding(u.title)}>
+                    Add to inventory
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {untracked.length > 0 && (
         <div className="panel" style={{ marginTop: 22 }}>
           <h3>Ordered, but not in inventory</h3>
@@ -159,7 +196,7 @@ export default function InventoryPage() {
   );
 }
 
-function ProductCard({ p, d, short, low }: { p: Product; d?: Demand; short: number; low: boolean }) {
+function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product; d?: Demand; short: number; low: boolean; shop?: Shop; over: number; hasShopify: boolean }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -225,6 +262,24 @@ function ProductCard({ p, d, short, low }: { p: Product; d?: Demand; short: numb
         {err && <span className="error">{err}</span>}
       </div>
 
+      {hasShopify && (
+        <div className="shop-row">
+          <span className="meta">On Shopify:</span>
+          {shop ? (
+            <>
+              {shop.sizes.map((z, i) => (
+                <span key={i} className={`shop-size${(z.qty ?? 0) <= 0 ? " zero" : ""}`}>
+                  {z.label} <b>{z.qty ?? "—"}</b>
+                </span>
+              ))}
+              <span className="meta">total {shop.total}{shop.live ? "" : " · not live"}</span>
+              {over > 0 && <span className="flag late">{over} more than we hold</span>}
+            </>
+          ) : (
+            <span className="meta">no matching product</span>
+          )}
+        </div>
+      )}
       <div className="row2" style={{ marginTop: 10 }}>
         <span className="meta">Ready stitched:</span>
         {stitched.length ? (

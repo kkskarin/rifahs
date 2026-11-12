@@ -269,3 +269,48 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
   if (errs.length || !data.orderCreate.order) throw new Error(errs.map((e) => e.message).join("; ") || "Shopify did not create the order");
   return { id: Number(data.orderCreate.order.legacyResourceId), name: data.orderCreate.order.name, matched, total: o.items.length };
 }
+
+// ── Stock (read-only) ──────────────────────────────────────────
+export type ShopifyVariantStock = {
+  variantId: number;
+  productId: number;
+  productTitle: string;
+  variantTitle: string;
+  status: string;
+  quantity: number | null;
+};
+
+/** What Shopify says is available to buy, per product and size. Needs the read_products permission. */
+export async function fetchStock(): Promise<ShopifyVariantStock[]> {
+  const out: ShopifyVariantStock[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const data: {
+      products: {
+        nodes: { legacyResourceId: string; title: string; status: string; variants: { nodes: { legacyResourceId: string; title: string; inventoryQuantity: number | null }[] } }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    } = await shopifyGraphQL(
+      `query($after: String) {
+        products(first: 40, after: $after) {
+          nodes { legacyResourceId title status variants(first: 60) { nodes { legacyResourceId title inventoryQuantity } } }
+          pageInfo { hasNextPage endCursor }
+        }
+      }`,
+      { after },
+    );
+    for (const p of data.products.nodes)
+      for (const v of p.variants.nodes)
+        out.push({
+          variantId: Number(v.legacyResourceId),
+          productId: Number(p.legacyResourceId),
+          productTitle: p.title,
+          variantTitle: v.title === "Default Title" ? "" : v.title,
+          status: p.status,
+          quantity: v.inventoryQuantity,
+        });
+    if (!data.products.pageInfo.hasNextPage) break;
+    after = data.products.pageInfo.endCursor;
+  }
+  return out;
+}
