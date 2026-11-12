@@ -23,7 +23,7 @@ export default function SalesNav() {
     { href: "/orders", label: "Orders", n: all },
     { href: "/express", label: "Express", n: s.expressDue, hot: s.expressDue > 0 },
     { href: "/international", label: "International", n: s.international },
-    { href: "/issues", label: "Issues", n: openIssues, hot: openIssues > 0 },
+    { href: "/stitching", label: "Stitching queue" },
   ];
 
   return (
@@ -43,10 +43,10 @@ export default function SalesNav() {
           <div className="label">Express due</div>
           <div className="value">{dash(s.expressDue)}</div>
         </div>
-        <div className="stat">
-          <div className="label">Open issues</div>
+        <Link href="/disputes" className="stat" style={{ textDecoration: "none" }}>
+          <div className="label">Open disputes</div>
           <div className="value">{issues ? openIssues : "…"}</div>
-        </div>
+        </Link>
       </section>
       <div className="subnav-row">
         <nav className="tabs" aria-label="Sales">

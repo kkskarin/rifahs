@@ -112,7 +112,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
     placed_at: o.createdAt,
   };
 
-  const cols = "id, status, is_express, notes, courier, tracking_number, dispatched_at";
+  const cols = "id, status, is_express, notes, courier, tracking_number, dispatched_at, items";
   let { data: existing } = await db.from("orders").select(cols).eq("shopify_id", shopifyId).maybeSingle();
   if (!existing) {
     // An entry imported earlier (order sheet / Shopify export) without a Shopify id: adopt it, don't duplicate.
@@ -157,6 +157,16 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
   }
 
   const patch: Record<string, unknown> = { ...shopifyOwned };
+  // Sizes the team changed in Core win over Shopify's: keep them, matched by item title in order.
+  const kept = ((existing.items ?? []) as OrderItem[]).filter((i) => i.size_changed);
+  if (kept.length) {
+    patch.items = (shopifyOwned.items as OrderItem[]).map((it) => {
+      const k = kept.findIndex((x) => x.title === it.title);
+      if (k < 0) return it;
+      const [mine] = kept.splice(k, 1);
+      return { ...it, size: mine.size, size_changed: true, original_size: it.size ?? mine.original_size ?? null };
+    });
+  }
   // Never un-set express that the team flagged by hand.
   patch.is_express = existing.is_express || isExpress(o);
   if (!existing.courier && tracking?.company) patch.courier = tracking.company;

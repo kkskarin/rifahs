@@ -51,7 +51,11 @@ export type OrderItem = {
   quantity: number;
   price?: number | null;
   sku?: string | null;
+  /** Set when the team changed the size here; the Shopify sync then leaves this item's size alone. */
+  size_changed?: boolean;
+  original_size?: string | null;
 };
+export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Unstitched", "Free size"];
 
 export type Order = {
   id: string;
@@ -111,6 +115,13 @@ export type Issue = {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
+  category: "shipping" | "customer";
+  updates?: IssueUpdate[];
+};
+export type IssueUpdate = { id: number; message: string; actor: string | null; created_at: string };
+export const DISPUTE_KINDS: Record<"shipping" | "customer", string[]> = {
+  shipping: ["Delayed in transit", "Stuck at hub", "Lost", "Damaged in transit", "Returned to origin (RTO)", "Wrong address", "Other"],
+  customer: ["Size / fit", "Alteration", "Wrong item", "Quality", "Return", "Exchange", "Refund", "Payment", "Other"],
 };
 
 export type Expense = {

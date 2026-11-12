@@ -72,7 +72,7 @@ export function useIssues() {
     async () => {
       const { data, error } = await sb()
         .from("issues")
-        .select("*, order:orders(id, order_number, customer_name)")
+        .select("*, order:orders(id, order_number, customer_name), updates:issue_updates(id, message, actor, created_at)")
         .order("created_at", { ascending: false })
         .limit(1000);
       if (error) throw error;
@@ -304,6 +304,26 @@ export async function saveOrder(me: Profile, existing: Order | null, input: Orde
   return { ok: true, message: "Saved" };
 }
 
+/** Change one item's size here. Core is the record for production; the Shopify sync keeps the change. */
+export async function changeItemSize(me: Profile, o: Order, index: number, size: string): Promise<Result> {
+  const item = o.items[index];
+  const next = size.trim();
+  if (!item || !next || next === (item.size ?? "")) return { ok: true };
+  const items = o.items.map((it, i) =>
+    i === index ? { ...it, size: next, size_changed: true, original_size: it.size_changed ? (it.original_size ?? null) : (it.size ?? null) } : it,
+  );
+  await patchOrdersCache((x) => (x.id === o.id ? { ...x, items } : x));
+  const { error } = await sb().from("orders").update({ items, updated_by: me.id }).eq("id", o.id);
+  if (error) {
+    mutate("orders");
+    return { ok: false, message: error.message };
+  }
+  await logEvents([{ order_id: o.id, kind: "edit", message: `Size changed: ${item.title} ${item.size ?? "—"} → ${next}`, actor: me.id }]);
+  mutate("orders");
+  mutate(["events", o.id]);
+  return { ok: true, message: "Size updated" };
+}
+
 export async function addNote(me: Profile, orderId: string, message: string): Promise<Result> {
   if (!message.trim()) return { ok: false, message: "Write something first" };
   const { error } = await sb().from("order_events").insert({ order_id: orderId, kind: "note", message: message.trim(), actor: me.id });
@@ -322,7 +342,7 @@ export async function deleteOrder(id: string): Promise<Result> {
 export async function saveIssue(
   me: Profile,
   orders: Order[],
-  input: { title: string; kind: string; courier: string | null; tracking_number: string | null; details: string; order_ref: string },
+  input: { title: string; kind: string; courier: string | null; tracking_number: string | null; details: string; order_ref: string; category?: "shipping" | "customer" },
 ): Promise<Result> {
   if (!input.title.trim()) return { ok: false, message: "Give the issue a short title" };
   let orderId: string | null = null;
@@ -339,11 +359,21 @@ export async function saveIssue(
     tracking_number: input.tracking_number,
     details: input.details,
     order_id: orderId,
+    category: input.category ?? "shipping",
     created_by: me.id,
   });
   if (error) return { ok: false, message: error.message };
   mutate("issues");
   return { ok: true, message: "Issue logged" };
+}
+
+export async function addIssueUpdate(me: Profile, issueId: string, message: string): Promise<Result> {
+  if (!message.trim()) return { ok: false, message: "Write the update first" };
+  const { error } = await sb().from("issue_updates").insert({ issue_id: issueId, message: message.trim(), actor: me.id });
+  if (error) return { ok: false, message: error.message };
+  await sb().from("issues").update({ updated_at: new Date().toISOString() }).eq("id", issueId);
+  mutate("issues");
+  return { ok: true };
 }
 
 export async function setIssueStatus(id: string, status: IssueStatus): Promise<Result> {

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { memo, useState } from "react";
-import { daysUntil, itemsLine, money, shortDate } from "@/lib/format";
+import { dueInfo, useDueRules } from "@/lib/due";
+import { itemsLine, money, shortDate } from "@/lib/format";
 import { dispatch, setStatus, useMe } from "@/lib/store";
 import { COURIERS, OPEN_STATUSES, STATUSES, STATUS_LABEL, nextStatus, type Order, type OrderStatus } from "@/lib/types";
 
-export default function OrderList({ orders }: { orders: Order[] }) {
+export default function OrderList({ orders, showNotes = true }: { orders: Order[]; showNotes?: boolean }) {
   const { data: me } = useMe();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -45,7 +46,7 @@ export default function OrderList({ orders }: { orders: Order[] }) {
 
       <div className="list">
         {shown.map((o) => (
-          <OrderCard key={o.id} o={o} selecting={selecting} selected={selected.has(o.id)} onToggle={toggle} />
+          <OrderCard key={o.id} o={o} selecting={selecting} selected={selected.has(o.id)} onToggle={toggle} showNotes={showNotes} />
         ))}
       </div>
       {orders.length > limit && (
@@ -95,17 +96,20 @@ const OrderCard = memo(function OrderCard({
   selecting,
   selected,
   onToggle,
+  showNotes,
 }: {
   o: Order;
   selecting: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
+  showNotes: boolean;
 }) {
   const { data: me } = useMe();
   const [dispatching, setDispatching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const next = nextStatus(o.status);
-  const due = daysUntil(o.promise_date);
+  const rules = useDueRules();
+  const due = dueInfo(o, rules);
   const open = OPEN_STATUSES.includes(o.status);
 
   return (
@@ -118,21 +122,22 @@ const OrderCard = memo(function OrderCard({
         </div>
         <span className="amt">{money(o.total, o.currency)}</span>
       </div>
+      {open && (
+        <div className={`due due-${due.level}`} title={due.promised ? "Promised date" : "Order date + standard time"}>
+          {due.label}
+          {due.promised ? " · promised" : ""}
+        </div>
+      )}
       <div className="row2">
         <span className={`pill ${o.status}`}>{STATUS_LABEL[o.status]}</span>
         {o.is_internal && <span className="flag late">Internal</span>}
         {o.is_express && <span className="flag express">Express</span>}
         {o.is_international && <span className="flag intl">International{o.ship_country ? ` · ${o.ship_country}` : ""}</span>}
-        {o.is_express && open && due !== null && (
-          <span className={`flag ${due < 0 ? "late" : "express"}`}>
-            {due < 0 ? `${-due}d late` : due === 0 ? "Due today" : `Due ${shortDate(o.promise_date)}`}
-          </span>
-        )}
         <span className="items">{itemsLine(o.items)}</span>
         {o.source && <span className="meta">{o.source}</span>}
         <span className="meta">{shortDate(o.placed_at)}</span>
       </div>
-      {o.notes && <div className="note">{o.notes}</div>}
+      {showNotes && o.notes && <div className="note">{o.notes}</div>}
       {(o.status === "dispatched" || o.status === "delivered") && o.tracking_number && (
         <div className="row2">
           <span className="meta">

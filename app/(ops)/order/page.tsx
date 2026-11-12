@@ -8,8 +8,8 @@ import OrderForm from "@/components/OrderForm";
 import { DispatchForm } from "@/components/OrderList";
 import { dateTime, itemsLine, money } from "@/lib/format";
 import { isAdmin } from "@/lib/roles";
-import { addNote, deleteOrder, useIssues, useMe, useOrderEvents, useOrders, useTeam } from "@/lib/store";
-import { OPEN_STATUSES, STATUS_LABEL } from "@/lib/types";
+import { addNote, changeItemSize, deleteOrder, useIssues, useMe, useOrderEvents, useOrders, useTeam } from "@/lib/store";
+import { OPEN_STATUSES, SIZE_OPTIONS, STATUS_LABEL } from "@/lib/types";
 
 const SHOP_ADMIN = "https://admin.shopify.com/store/xd1uww-uu";
 
@@ -90,6 +90,50 @@ export default function OrderPage() {
         )}
       </div>
 
+      <div className="panel">
+        <h3>Items &amp; sizes</h3>
+        <p className="hint" style={{ marginTop: -6 }}>
+          Change a size here when the customer asks. It is used for stitching and stock from then on, and is kept when Shopify syncs.
+        </p>
+        <div className="master-list">
+          {o.items.map((it, i) => (
+            <div key={i} className="master-row">
+              <span className="master-name">
+                {it.title}
+                {it.quantity > 1 ? ` ×${it.quantity}` : ""}
+              </span>
+              {it.size_changed && <span className="meta">was {it.original_size ?? "—"}</span>}
+              <span className="master-actions">
+                <label className="sr-only" htmlFor={`size-${i}`}>
+                  Size
+                </label>
+                <select
+                  id={`size-${i}`}
+                  value={it.size ?? ""}
+                  disabled={!me}
+                  onChange={async (e) => {
+                    if (!me) return;
+                    let v = e.target.value;
+                    if (v === "__other") v = prompt("Size (e.g. 4XL, or custom measurements)") ?? "";
+                    if (v) await changeItemSize(me, o, i, v);
+                  }}
+                  style={{ padding: "6px 8px" }}
+                >
+                  {!it.size && <option value="">No size</option>}
+                  {[...new Set([...(it.size ? [it.size] : []), ...SIZE_OPTIONS])].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                  <option value="__other">Other…</option>
+                </select>
+              </span>
+            </div>
+          ))}
+          {!o.items.length && <p className="hint">No items recorded on this order.</p>}
+        </div>
+      </div>
+
       <OrderForm key={o.updated_at} order={o} />
 
       <div className="panel">
@@ -111,9 +155,9 @@ export default function OrderPage() {
         </form>
         {orderIssues.length ? (
           <div className="link-row hint">
-            <span>Issues:</span>
+            <span>Disputes:</span>
             {orderIssues.map((i) => (
-              <Link key={i.id} className="link" href="/issues">
+              <Link key={i.id} className="link" href="/disputes">
                 {i.title} ({i.status})
               </Link>
             ))}
