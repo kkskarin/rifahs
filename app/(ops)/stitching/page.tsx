@@ -171,7 +171,7 @@ export default function StitchingQueuePage() {
                       <span className="queue-plan">
                         {g.product
                           ? [
-                              `Fabric in stock ${g.fabricStart}`,
+                              `Unstitched stock ${g.fabricStart}`,
                               g.product.stitched.filter((r) => r.qty > 0).length ? `ready ${g.product.stitched.filter((r) => r.qty > 0).map((r) => `${r.size}×${r.qty}`).join(", ")}` : "",
                               g.stitchBySize.length ? `stitch ${g.stitchBySize.map(([s, n]) => `${n} × ${s}`).join(", ")}` : "",
                               g.counts["need-fabric"] ? `${g.counts["need-fabric"]} more fabric needed${g.product.in_production ? ` (${g.product.in_production} in production)` : ""}` : "",

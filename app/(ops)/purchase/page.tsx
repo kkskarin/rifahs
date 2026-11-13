@@ -13,7 +13,7 @@ export default function PurchasePage() {
         <h3>Coming next</h3>
         <p className="hint">
           This is where purchase orders will live — raise a PO to the printer, track it until the fabric arrives, and have it
-          land straight into Inventory. Until then, fabric that&apos;s been ordered is tracked as <b>In production</b> on the{" "}
+          land straight into Inventory. Until then, fabric that&apos;s been ordered is tracked as <b>Waiting for fabric</b> on the{" "}
           <Link className="link" href="/inventory">
             Inventory
           </Link>{" "}

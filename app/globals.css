@@ -292,7 +292,7 @@ table.t .stack-actions { white-space: nowrap; text-align: right; }
   .inv-totals > div:nth-child(even) { border-left: 1px solid var(--line) !important; }
   .inv-totals > div:last-child { grid-column: 1 / -1; }
 }
-.inv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-top: 12px; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; margin-top: 12px; }
 .list.inv-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr)); }
 .counter { display: grid; gap: 4px; background: rgb(var(--ink-rgb) / 0.03); border-radius: 5px; padding: 8px 10px; }
 .counter > span { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
