@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { mutate } from "swr";
-import { pushOrderToShopify } from "@/app/(ops)/actions";
+import { lookupPin, pushOrderToShopify } from "@/app/(ops)/actions";
+import { COUNTRIES, IN_STATE_NAMES, matchState } from "@/lib/places";
 import { entryTotals, taxTypeFor, type EntryLine } from "@/lib/entry";
 import { money } from "@/lib/format";
 import { normDesign, useProducts, useShopifyStock } from "@/lib/inventory";
@@ -14,7 +15,6 @@ import { GST_RATES, OPEN_STATUSES, PAYMENT_TERMS, SIZE_OPTIONS, STATUSES, STATUS
 
 const blank = (): EntryLine => ({ title: "", size: "", quantity: 1, price: 0, tax_rate: 5 });
 const num = (v: string) => Number(v.replace(/[₹,\s]/g, "")) || 0;
-const STATES = ["Tamil Nadu", "Karnataka", "Kerala", "Andhra Pradesh", "Telangana", "Maharashtra", "Delhi", "Gujarat", "West Bengal", "Uttar Pradesh", "Rajasthan", "Punjab", "Haryana", "Madhya Pradesh", "Odisha", "Bihar", "Assam", "Goa", "Puducherry"];
 
 /** Manual order entry: an items table with GST breakup, then delivery and payment details. */
 export default function EntryForm({ order }: { order?: Order }) {
@@ -32,6 +32,42 @@ export default function EntryForm({ order }: { order?: Order }) {
   const [taxMode, setTaxMode] = useState<TaxMode>(order?.tax_mode ?? "inclusive");
   const [state, setState] = useState(addr?.province ?? "");
   const [country, setCountry] = useState(order?.ship_country ?? "India");
+  const [otherCountry, setOtherCountry] = useState(Boolean(order?.ship_country && !COUNTRIES.includes(order.ship_country)));
+  const [city, setCity] = useState(order?.ship_city ?? "");
+  const [district, setDistrict] = useState(addr?.district ?? "");
+  const [pin, setPin] = useState(addr?.zip ?? "");
+  const [pinNote, setPinNote] = useState("");
+  const india = /^(india|in)?$/i.test(country.trim());
+  // Typing a PIN fills in city, district and state. They stay editable.
+  const onPin = async (raw: string) => {
+    const value = raw.replace(/\s/g, "");
+    setPin(value);
+    if (!india || !/^[1-9]\d{5}$/.test(value)) return setPinNote("");
+    setPinNote("Looking up…");
+    const r = (await safe(() => lookupPin(value))) as Awaited<ReturnType<typeof lookupPin>>;
+    if (!r.ok) return setPinNote("PIN not found — please fill in the city and state.");
+    setState(matchState(r.state ?? ""));
+    setDistrict(r.district ?? "");
+    setCity(r.city ?? "");
+    setPinNote(r.areas?.length ? `Post office: ${r.areas.slice(0, 4).join(", ")}${r.areas.length > 4 ? "…" : ""}` : "");
+  };
+  // Designs to pick from: Core's own list plus whatever Shopify sells.
+  const designs = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const p of products ?? []) if (p.active) seen.set(normDesign(p.name), p.name);
+    for (const x of stock ?? []) if (x.product_status === "active" && !seen.has(normDesign(x.product_title))) seen.set(normDesign(x.product_title), x.product_title);
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [products, stock]);
+  const [typed, setTyped] = useState<Record<number, boolean>>({});
+  // Sizes Shopify sells for a design; the standard list when it isn't a Shopify product.
+  const sizesFor = (title: string) => {
+    const key = normDesign(title);
+    const found = (stock ?? [])
+      .filter((x) => normDesign(x.product_title) === key)
+      .map((x) => x.variant_title.trim())
+      .filter((x) => x && x !== "Default Title");
+    return found.length ? [...new Set(found)] : SIZE_OPTIONS;
+  };
   const [taxTypePick, setTaxTypePick] = useState<TaxType | "auto">(order?.tax_type ? order.tax_type : "auto");
   const [shipping, setShipping] = useState(String(order?.shipping_charge ?? ""));
   const [payment, setPayment] = useState<"full" | "part" | "none">(
@@ -51,7 +87,7 @@ export default function EntryForm({ order }: { order?: Order }) {
   const priceFor = (title: string, size: string) => {
     const key = normDesign(title);
     const hits = (stock ?? []).filter((s) => normDesign(s.product_title) === key && s.price != null);
-    const hit = hits.find((s) => s.variant_title.split("/").some((p) => p.trim().toUpperCase() === size.toUpperCase())) ?? (size ? undefined : hits[0]);
+    const hit = hits.find((s) => s.variant_title.trim().toUpperCase() === size.toUpperCase()) ?? hits.find((s) => s.variant_title.split("/").some((p) => p.trim().toUpperCase() === size.toUpperCase())) ?? (size ? undefined : hits[0]);
     return hit?.price ?? null;
   };
   const setLine = (i: number, patch: Partial<EntryLine>) =>
@@ -82,9 +118,10 @@ export default function EntryForm({ order }: { order?: Order }) {
           customer_phone: v("customer_phone") || null,
           customer_email: v("customer_email") || null,
           address1: v("address1") || null,
-          city: v("city") || null,
+          city: city.trim() || null,
+          district: district.trim() || null,
           province: state.trim() || null,
-          zip: v("zip") || null,
+          zip: pin.trim() || null,
           ship_country: country.trim() || "India",
           lines,
           tax_mode: taxMode,
@@ -92,6 +129,7 @@ export default function EntryForm({ order }: { order?: Order }) {
           shipping_charge: num(shipping),
           amount_paid: paidAmount,
           payment_terms: payment === "full" ? "" : [v("payment_terms"), v("payment_note")].filter(Boolean).join(" — "),
+          payment_due_date: payment === "full" ? null : v("payment_due_date") || null,
           promise_date: v("promise_date") || null,
           notes: v("notes"),
           status: (v("status") || "new") as OrderStatus,
@@ -143,25 +181,49 @@ export default function EntryForm({ order }: { order?: Order }) {
           <input name="address1" defaultValue={addr?.address1 ?? ""} placeholder="House, street, area" />
         </label>
         <label className="field">
-          <span>City</span>
-          <input name="city" defaultValue={order?.ship_city ?? ""} />
-        </label>
-        <label className="field">
-          <span>State</span>
-          <input list="entry-states" value={state} onChange={(e) => setState(e.target.value)} />
-          <datalist id="entry-states">
-            {STATES.map((x) => (
-              <option key={x} value={x} />
-            ))}
-          </datalist>
-        </label>
-        <label className="field">
-          <span>PIN code</span>
-          <input name="zip" inputMode="numeric" defaultValue={addr?.zip ?? ""} />
-        </label>
-        <label className="field">
           <span>Country</span>
-          <input value={country} onChange={(e) => setCountry(e.target.value)} />
+          <select
+            value={otherCountry ? "__other" : country || "India"}
+            onChange={(e) => {
+              const other = e.target.value === "__other";
+              setOtherCountry(other);
+              setCountry(other ? "" : e.target.value);
+            }}
+          >
+            {COUNTRIES.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+            <option value="__other">Other…</option>
+          </select>
+          {otherCountry && <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Country name" aria-label="Country name" style={{ marginTop: 6 }} />}
+        </label>
+        <label className="field">
+          <span>{india ? "PIN code" : "Postal code"}</span>
+          <input inputMode={india ? "numeric" : "text"} value={pin} onChange={(e) => onPin(e.target.value)} placeholder={india ? "Fills in city and state" : ""} />
+          {pinNote && <small className="hint" style={{ margin: 0 }}>{pinNote}</small>}
+        </label>
+        <label className="field">
+          <span>City</span>
+          <input value={city} onChange={(e) => setCity(e.target.value)} />
+        </label>
+        {india && (
+          <label className="field">
+            <span>District</span>
+            <input value={district} onChange={(e) => setDistrict(e.target.value)} />
+          </label>
+        )}
+        <label className="field">
+          <span>{india ? "State" : "State / region"}</span>
+          {india ? (
+            <select value={state} onChange={(e) => setState(e.target.value)}>
+              <option value="">Choose…</option>
+              {[...new Set([...(state && !IN_STATE_NAMES.includes(state) ? [state] : []), ...IN_STATE_NAMES])].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          ) : (
+            <input value={state} onChange={(e) => setState(e.target.value)} />
+          )}
         </label>
       </div>
 
@@ -187,13 +249,6 @@ export default function EntryForm({ order }: { order?: Order }) {
         )}
       </div>
 
-      <datalist id="entry-designs">
-        {(products ?? [])
-          .filter((p) => p.active)
-          .map((p) => (
-            <option key={p.id} value={p.name} />
-          ))}
-      </datalist>
       <div className="scroll-x">
         <table className="t stack entry-table">
           <thead>
@@ -214,12 +269,31 @@ export default function EntryForm({ order }: { order?: Order }) {
               return (
                 <tr key={i}>
                   <td data-label="Item name">
-                    <input list="entry-designs" value={l.title} onChange={(e) => setLine(i, { title: e.target.value })} placeholder="Pick a design or type one" aria-label="Item name" />
+                    {typed[i] || (l.title && !designs.includes(l.title)) ? (
+                      <span style={{ display: "flex", gap: 6 }}>
+                        <input value={l.title} onChange={(e) => setLine(i, { title: e.target.value })} placeholder="Type the item name" aria-label="Item name" autoFocus={typed[i]} />
+                        <button type="button" className="link" onClick={() => { setTyped((x) => ({ ...x, [i]: false })); setLine(i, { title: "" }); }}>
+                          List
+                        </button>
+                      </span>
+                    ) : (
+                      <select
+                        value={l.title}
+                        onChange={(e) => (e.target.value === "__other" ? setTyped((x) => ({ ...x, [i]: true })) : setLine(i, { title: e.target.value, size: sizesFor(e.target.value).includes(l.size) ? l.size : "" }))}
+                        aria-label="Item name"
+                      >
+                        <option value="">Choose a design…</option>
+                        {designs.map((d) => (
+                          <option key={d}>{d}</option>
+                        ))}
+                        <option value="__other">Other — type a name…</option>
+                      </select>
+                    )}
                   </td>
                   <td data-label="Size">
                     <select value={l.size} onChange={(e) => setLine(i, { size: e.target.value })} aria-label="Size">
                       <option value="">—</option>
-                      {[...new Set([...(l.size ? [l.size] : []), ...SIZE_OPTIONS])].map((s) => (
+                      {[...new Set([...(l.size ? [l.size] : []), ...sizesFor(l.title)])].map((s) => (
                         <option key={s}>{s}</option>
                       ))}
                     </select>
@@ -325,11 +399,15 @@ export default function EntryForm({ order }: { order?: Order }) {
           <>
             <label className="field">
               <span>Balance {money(balance)} is</span>
-              <select name="payment_terms" defaultValue={PAYMENT_TERMS.find((p) => order?.payment_terms?.startsWith(p)) ?? PAYMENT_TERMS[0]}>
-                {PAYMENT_TERMS.map((p) => (
+              <select name="payment_terms" key={payment} defaultValue={PAYMENT_TERMS.find((p) => order?.payment_terms?.startsWith(p)) ?? (payment === "part" ? "Advance paid, balance on dispatch" : PAYMENT_TERMS[0])}>
+                {PAYMENT_TERMS.filter((p) => payment === "part" || !p.startsWith("Advance paid")).map((p) => (
                   <option key={p}>{p}</option>
                 ))}
               </select>
+            </label>
+            <label className="field">
+              <span>Payment due on</span>
+              <input name="payment_due_date" type="date" defaultValue={order?.payment_due_date ?? ""} />
             </label>
             <label className="field">
               <span>Payment note (optional)</span>
@@ -338,7 +416,7 @@ export default function EntryForm({ order }: { order?: Order }) {
           </>
         )}
         <label className="field">
-          <span>Due date</span>
+          <span>Delivery due date</span>
           <input name="promise_date" type="date" defaultValue={order?.promise_date ?? ""} />
         </label>
         <label className="field">

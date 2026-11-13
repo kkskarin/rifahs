@@ -206,7 +206,7 @@ const IN_STATES: Record<string, string> = Object.fromEntries(
     .map((x) => x.split(":") as [string, string]),
 );
 
-const normSize = (s: string | null | undefined) => (s ?? "").trim().toUpperCase().replace("2XL", "XXL");
+const normSize = (s: string | null | undefined) => (s ?? "").trim().toUpperCase().replace("2XL", "XXL").replace("3XL", "XXXL");
 
 /** Find the Shopify variant for "Design" + size so stock and reports stay right. Needs read_products; null if unavailable. */
 async function findVariant(title: string, size: string | null): Promise<string | null> {
@@ -221,7 +221,7 @@ async function findVariant(title: string, size: string | null): Promise<string |
     if (!product) return null;
     const vs = product.variants.nodes;
     if (!size) return vs.length === 1 ? vs[0].id : null;
-    return vs.find((v) => v.title.split("/").some((part) => normSize(part) === normSize(size)))?.id ?? null;
+    return vs.find((v) => normSize(v.title) === normSize(size))?.id ?? vs.find((v) => v.title.split("/").some((part) => normSize(part) === normSize(size)))?.id ?? null;
   } catch {
     return null;
   }

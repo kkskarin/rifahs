@@ -194,6 +194,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .field input, .field select, .field textarea {
   border: 1px solid var(--line-strong); background: var(--field); border-radius: 4px; padding: 10px 12px; width: 100%;
 }
+/* iPhone date boxes ignore width and collapse when empty unless told otherwise. */
+.field input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; min-height: 44px; display: block; text-align: left; }
+.field input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+.field { min-width: 0; }
 .field textarea { min-height: 84px; resize: vertical; }
 .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid rgb(130 37 55 / 0.35); border-color: var(--wine); }
 .checkbox { display: flex; gap: 8px; align-items: center; font-size: 14px; }

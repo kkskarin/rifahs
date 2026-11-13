@@ -83,7 +83,7 @@ export type TaxMode = "none" | "inclusive" | "exclusive";
 export type TaxType = "" | "cgst_sgst" | "igst";
 export const GST_RATES = [0, 5, 12, 18];
 export const PAYMENT_TERMS = ["Due on dispatch", "Cash on delivery", "Advance paid, balance on dispatch", "Credit — pay later", "Other"];
-export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Unstitched", "Free size"];
+export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Unstitched"];
 
 export type Order = {
   id: string;
@@ -109,6 +109,7 @@ export type Order = {
   tax_type?: TaxType;
   amount_paid?: number | null;
   payment_terms?: string;
+  payment_due_date?: string | null;
   ship_country: string | null;
   ship_city: string | null;
   ship_address: Record<string, unknown> | null;

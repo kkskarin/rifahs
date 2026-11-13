@@ -25,7 +25,7 @@ import {
 export type Result = { ok: boolean; message?: string; id?: string };
 
 const ORDER_COLS =
-  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, shipping_charge, tax_mode, tax_type, amount_paid, payment_terms, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
+  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, shipping_charge, tax_mode, tax_type, amount_paid, payment_terms, payment_due_date, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
 
 const swrOpts = { revalidateOnFocus: true, dedupingInterval: 4000, keepPreviousData: true };
 
@@ -388,6 +388,8 @@ export type EntryInput = {
   shipping_charge: number;
   amount_paid: number;
   payment_terms: string;
+  payment_due_date: string | null;
+  district: string | null;
   promise_date: string | null;
   notes: string;
   status: OrderStatus;
@@ -411,7 +413,7 @@ export async function saveEntry(me: Profile, existing: Order | null, e: EntryInp
     customer_email: e.customer_email,
     ship_city: e.city,
     ship_country: e.ship_country,
-    ship_address: e.address1 || e.city || e.zip ? { address1: e.address1, city: e.city, province: e.province, zip: e.zip, country: e.ship_country || "India" } : null,
+    ship_address: e.address1 || e.city || e.zip ? { address1: e.address1, city: e.city, district: e.district, province: e.province, zip: e.zip, country: e.ship_country || "India" } : null,
     items,
     total: t.total,
     shipping_charge: t.shipping,
@@ -419,6 +421,7 @@ export async function saveEntry(me: Profile, existing: Order | null, e: EntryInp
     tax_type: e.tax_mode === "none" ? "" : e.tax_type,
     amount_paid: paid,
     payment_terms: paid >= t.total ? "" : e.payment_terms,
+    payment_due_date: paid >= t.total ? null : e.payment_due_date,
     financial_status: paid >= t.total && t.total > 0 ? "paid" : paid > 0 ? "partially_paid" : "pending",
     promise_date: e.promise_date,
     notes: e.notes,

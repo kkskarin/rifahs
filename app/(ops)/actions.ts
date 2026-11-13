@@ -99,7 +99,7 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
   const lines = items.map((i) => ({ title: i.title, size: i.size ?? null, quantity: Number(i.quantity || 1), price: priced ? Number(i.price) : each, taxRate: Number(i.tax_rate ?? 0) }));
   const paidAmount = Number(o.amount_paid ?? (o.financial_status === "pending" ? 0 : total));
   const fullyPaid = paidAmount >= total;
-  const paymentNote = fullyPaid ? "" : `Payment: ${paidAmount > 0 ? `₹${paidAmount} received, ` : ""}₹${Math.round((total - paidAmount) * 100) / 100} balance${o.payment_terms ? ` — ${o.payment_terms}` : ""}`;
+  const paymentNote = fullyPaid ? "" : `Payment: ${paidAmount > 0 ? `₹${paidAmount} received, ` : ""}₹${Math.round((total - paidAmount) * 100) / 100} balance${o.payment_terms ? ` — ${o.payment_terms}` : ""}${o.payment_due_date ? ` — due ${o.payment_due_date}` : ""}`;
 
   try {
     const r = await createShopifyOrder({
@@ -191,5 +191,26 @@ export async function fulfilInShopify(orderId: string, notifyCustomer: boolean):
     return { ok: true, message: r.message };
   } catch (e) {
     return refused("fulfil", e);
+  }
+}
+
+// ───────────────────────── PIN code → city, district, state ─────────────────────────
+
+export type PinResult = { ok: boolean; state?: string; district?: string; city?: string; areas?: string[] };
+
+/** India Post's public PIN directory. Only the six digits are sent; nothing about the customer. */
+export async function lookupPin(pin: string): Promise<PinResult> {
+  await requireMember();
+  if (!/^[1-9]\d{5}$/.test(pin)) return { ok: false };
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`, { signal: AbortSignal.timeout(6000), next: { revalidate: 86400 } });
+    const data = (await res.json()) as { Status: string; PostOffice: { Name: string; District: string; Block: string; State: string }[] | null }[];
+    const offices = data?.[0]?.PostOffice;
+    if (data?.[0]?.Status !== "Success" || !offices?.length) return { ok: false };
+    const o = offices[0];
+    const block = o.Block && !/^(na|n\.a\.?|null)$/i.test(o.Block.trim()) ? o.Block.trim() : "";
+    return { ok: true, state: o.State, district: o.District, city: block || o.District, areas: [...new Set(offices.map((x) => x.Name))] };
+  } catch {
+    return { ok: false };
   }
 }
