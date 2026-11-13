@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ReloadButton, UpdateBar } from "@/components/Reload";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isAdmin } from "@/lib/roles";
@@ -155,6 +156,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
                 <button role="menuitem" onClick={signOutEverywhere}>
                   Sign out
                 </button>
+                <ReloadButton />
                 <div className="build-tag">Version {process.env.NEXT_PUBLIC_BUILD}</div>
               </div>
             )}
@@ -162,6 +164,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      <UpdateBar />
       <main className="page">
         <Suspense fallback={<p className="empty">Loading…</p>}>{me ? children : <p className="empty">Loading…</p>}</Suspense>
       </main>
