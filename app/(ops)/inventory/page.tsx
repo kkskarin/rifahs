@@ -1,11 +1,10 @@
 "use client";
 
-import DesignTables, { type Piece } from "@/components/DesignTables";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { dateTime } from "@/lib/format";
 import ProductForm from "@/components/ProductForm";
-import { adjust, demandByProduct, normDesign, shopifyByProduct, useMoves, useProducts, useShopifyStock, type Demand } from "@/lib/inventory";
+import { adjust, demandByProduct, shopifyByProduct, useMoves, useProducts, useShopifyStock, type Demand } from "@/lib/inventory";
 import { useOrders, useTeam } from "@/lib/store";
 import { STOCK_LABEL, type Product, type StockField } from "@/lib/types";
 
@@ -20,20 +19,7 @@ export default function InventoryPage() {
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState<string | null>(null); // prefilled name, "" = blank
 
-  const { demand, untracked, keyToId } = useMemo(() => demandByProduct(products, orders), [products, orders]);
-  // Every ordered piece of each design (test orders, cancellations and refunds left out), for the size tables.
-  const pieces = useMemo(() => {
-    const m = new Map<string, Piece[]>();
-    for (const o of orders ?? []) {
-      if (o.is_internal || o.status === "cancelled" || o.status === "refunded") continue;
-      for (const it of o.items ?? []) {
-        const id = keyToId.get(normDesign(it.title));
-        if (!id) continue;
-        m.set(id, [...(m.get(id) ?? []), { status: o.status, size: it.size ?? null, qty: Number(it.quantity || 1), placed_at: o.placed_at }]);
-      }
-    }
-    return m;
-  }, [orders, keyToId]);
+  const { demand, untracked } = useMemo(() => demandByProduct(products, orders), [products, orders]);
   const { data: stock } = useShopifyStock();
   const shop = useMemo(() => shopifyByProduct(products, stock), [products, stock]);
   // The agreed rule: every size may show (unstitched stock we hold − uncommitted orders), plus ready pieces of that size.
@@ -150,7 +136,7 @@ export default function InventoryPage() {
       ) : (
         <div className="list inv-list">
           {list.map((p) => (
-            <ProductCard key={p.id} p={p} pieces={pieces.get(p.id) ?? NO_PIECES} {...status(p)} shop={shop.byId.get(p.id)} over={oversold(p)} hasShopify={Boolean(stock?.length)} />
+            <ProductCard key={p.id} p={p} {...status(p)} shop={shop.byId.get(p.id)} over={oversold(p)} hasShopify={Boolean(stock?.length)} />
           ))}
         </div>
       )}
@@ -214,12 +200,9 @@ export default function InventoryPage() {
   );
 }
 
-const NO_PIECES: Piece[] = [];
-
-function ProductCard({ p, pieces, d, short, low, shop, over, hasShopify }: { p: Product; pieces: Piece[]; d?: Demand; short: number; low: boolean; shop?: Shop; over: number; hasShopify: boolean }) {
+function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product; d?: Demand; short: number; low: boolean; shop?: Shop; over: number; hasShopify: boolean }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [adjusting, setAdjusting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [newSize, setNewSize] = useState("");
   const run = async (changes: Parameters<typeof adjust>[1], reason: string) => {
@@ -246,9 +229,6 @@ function ProductCard({ p, pieces, d, short, low, shop, over, hasShopify }: { p: 
       </div>
       {p.notes && <div className="meta" style={{ marginTop: 2 }}>{p.notes}</div>}
 
-      <DesignTables p={p} pieces={pieces} />
-
-      {adjusting && (
       <div className="inv-grid">
         <div className="counter" title="Ordered pieces not yet sent for stitching">
           <span>1 · Uncommitted orders</span>
@@ -269,7 +249,6 @@ function ProductCard({ p, pieces, d, short, low, shop, over, hasShopify }: { p: 
           {short > 0 && <small>{p.in_production >= short ? "covered when fabric arrives" : `${short - p.in_production} not on order yet`}</small>}
         </div>
       </div>
-      )}
 
       <div className="actions" style={{ marginTop: 10 }}>
         <button
@@ -287,9 +266,6 @@ function ProductCard({ p, pieces, d, short, low, shop, over, hasShopify }: { p: 
           title="Move 1 from unstitched stock to the stitching unit"
         >
           → Stitching
-        </button>
-        <button className="link" onClick={() => setAdjusting((a) => !a)}>
-          {adjusting ? "Hide numbers" : "Adjust stock"}
         </button>
         <button className="link" onClick={() => setOpen((o) => !o)}>
           {open ? "Hide" : "Details"}

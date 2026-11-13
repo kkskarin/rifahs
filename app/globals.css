@@ -699,18 +699,3 @@ table.entry-table td.n input { text-align: right; }
 @media (pointer: coarse) {
   input, select, textarea { font-size: 16px !important; }
 }
-
-/* Stock / Orders / Dispatched tables on each design, split by size. */
-.design-tables { display: grid; gap: 12px; margin-top: 12px; }
-/* Fixed columns so the three tables line up and fit a phone without side-scrolling. */
-table.t.sizes { font-size: 13.5px; width: 100%; table-layout: fixed; }
-table.t.sizes th, table.t.sizes td { padding: 6px 2px; }
-table.t.sizes th.n { letter-spacing: 0; font-size: 10.5px; overflow: hidden; }
-table.t.sizes th:first-child, table.t.sizes td:first-child { width: 34%; }
-table.t.sizes th:first-child { color: var(--ink); font-weight: 600; font-size: 12px; }
-table.t.sizes td:first-child { white-space: normal; padding-left: 0; }
-table.t.sizes th:first-child { padding-left: 0; }
-table.t.sizes .nil { color: var(--muted); opacity: 0.55; }
-table.t.sizes tr.bad td { color: var(--danger, #8f1d1d); }
-table.t.sizes tr.wait td:first-child { font-style: italic; }
-table.t.sizes tr.sum td { border-top: 1px solid var(--line-strong); border-bottom: 0; font-weight: 600; }
