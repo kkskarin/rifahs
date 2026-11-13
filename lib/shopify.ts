@@ -5,7 +5,8 @@ import "server-only";
 //  - updateOrderDetails(): customer email, note and shipping address edited in Core
 //  - changeLineSize(): a size changed in Core (Shopify order edit)
 //  - fulfillOrder(): an order dispatched in Core is marked fulfilled, emailing the customer only if ticked
-// Never cancel or refund from here.
+//  - cancelAndDeleteCoreOrder(): owner removes a test order that Core itself created (tag "Kaleidoscope Core")
+// Never cancel, refund or delete any other order from here.
 
 const SHOP = process.env.SHOPIFY_STORE_DOMAIN ?? "xd1uww-uu.myshopify.com";
 const VERSION = process.env.SHOPIFY_API_VERSION ?? "2026-10";
@@ -246,7 +247,9 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
     const variantId = await findVariant(it.title, it.size);
     if (variantId) matched++;
     lineItems.push({
-      ...(variantId ? { variantId } : { title: it.title, ...(it.size ? { variantTitle: it.size } : {}), requiresShipping: true }),
+      ...(variantId ? { variantId } : { title: it.title, ...(it.size ? { variantTitle: it.size } : {}) }),
+      // Without this Shopify files the item under "Shipping not required" and splits the order in two.
+      requiresShipping: true,
       quantity: it.quantity,
       priceSet: { shopMoney: { amount: it.price.toFixed(2), currencyCode: "INR" } },
       ...(taxLinesFor(it, o.taxMode ?? "none", o.taxType ?? "") ?? {}),
@@ -262,7 +265,7 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
     financialStatus: o.paid ? "PAID" : "PENDING",
     ...(o.taxMode && o.taxMode !== "none" ? { taxesIncluded: o.taxMode === "inclusive" } : {}),
     ...(o.shipping && o.shipping > 0
-      ? { shippingLines: [{ title: "Shipping", priceSet: { shopMoney: { amount: o.shipping.toFixed(2), currencyCode: "INR" } } }] }
+      ? { shippingLines: [{ title: "Standard", priceSet: { shopMoney: { amount: o.shipping.toFixed(2), currencyCode: "INR" } } }] }
       : {}),
     note: o.note || undefined,
     tags: o.tags,
@@ -447,4 +450,35 @@ export async function fulfillOrder(legacyId: number, t: { company?: string | nul
   );
   userErrors(r.fulfillmentCreate.userErrors);
   return { ok: true as const, message: notifyCustomer ? "Marked fulfilled in Shopify; the customer was emailed." : "Marked fulfilled in Shopify (no email sent)." };
+}
+
+// ── Remove a test order that Core created ──────────────────────
+export const CORE_TAG = "Kaleidoscope Core";
+
+/** Cancel (no refund, no email, stock put back) and then delete. Refuses any order Core did not create. */
+export async function cancelAndDeleteCoreOrder(legacyId: number) {
+  const id = gid(legacyId);
+  const read = () =>
+    shopifyGraphQL<{ order: { name: string; tags: string[]; cancelledAt: string | null } | null }>(`query($id: ID!) { order(id: $id) { name tags cancelledAt } }`, { id });
+  let o = (await read()).order;
+  if (!o) return { cancelled: true, deleted: true, message: "It was already gone from Shopify." };
+  if (!o.tags.includes(CORE_TAG)) throw new Error(`${o.name} was not created from Core, so it is left alone`);
+  if (!o.cancelledAt) {
+    const r = await shopifyGraphQL<{ orderCancel: { orderCancelUserErrors: { message: string }[] } }>(
+      `mutation($id: ID!) { orderCancel(orderId: $id, reason: OTHER, restock: true, notifyCustomer: false, staffNote: "Test order removed from Kaleidoscope Core") { orderCancelUserErrors { message } } }`,
+      { id },
+    );
+    userErrors(r.orderCancel.orderCancelUserErrors);
+    // Cancelling runs in the background at Shopify; give it a few seconds.
+    for (let i = 0; i < 6 && !o?.cancelledAt; i++) {
+      await new Promise((res) => setTimeout(res, 800));
+      o = (await read()).order;
+    }
+  }
+  const d = await shopifyGraphQL<{ orderDelete: { deletedId: string | null; userErrors: { message: string }[] } }>(
+    `mutation($id: ID!) { orderDelete(orderId: $id) { deletedId userErrors { message } } }`,
+    { id },
+  );
+  if (d.orderDelete.deletedId) return { cancelled: true, deleted: true, message: "Cancelled and deleted in Shopify." };
+  return { cancelled: true, deleted: false, message: `Cancelled in Shopify, but Shopify would not delete it: ${d.orderDelete.userErrors.map((e) => e.message).join("; ") || "no reason given"}` };
 }

@@ -135,7 +135,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
       .from("orders")
       .insert({
         ...shopifyOwned,
-        is_internal: INTERNAL_EMAILS.includes((o.email ?? "").toLowerCase()),
+        is_internal: INTERNAL_EMAILS.includes((o.email ?? "").toLowerCase()) || o.tags.includes("Test"),
         status: implied ?? "new",
         is_express: isExpress(o),
         notes,
@@ -157,6 +157,8 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
   }
 
   const patch: Record<string, unknown> = { ...shopifyOwned };
+  // An order made in Core without an address has no name in Shopify: keep the name typed in Core.
+  if (!cleanName(o.shippingAddress?.name || o.customer?.displayName)) delete patch.customer_name;
   // Sizes the team changed in Core win over Shopify's: keep them, matched by item title in order.
   const kept = ((existing.items ?? []) as OrderItem[]).filter((i) => i.size_changed);
   if (kept.length) {

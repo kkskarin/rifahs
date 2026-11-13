@@ -89,7 +89,7 @@ export default function OrderPage() {
             </a>
           </p>
         )}
-        {!o.shopify_id && !o.is_internal && (
+        {!o.shopify_id && (
           <p style={{ marginBottom: 0 }}>
             <button
               className="btn small"

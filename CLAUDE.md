@@ -15,5 +15,8 @@ Supabase project "Rifah's Kaleidoscope" (cqirofbbxoedbirijnva, Mumbai), Netlify 
 Shopify: orders and stock are read by the sync. Allowed writes (each at the user's request, all in
 `lib/shopify.ts`): `createShopifyOrder` (manual entry → Shopify order), `updateOrderDetails`
 (customer email / shipping address), `changeLineSize` (order edit), `fulfillOrder` (dispatch; customer
-emailed only when the box is ticked). Never cancel or refund Shopify orders, never change Shopify stock
-or prices, and never send customer emails by default.
+emailed only when the box is ticked), `cancelAndDeleteCoreOrder` (owner removes a test order that Core
+itself created — tag "Kaleidoscope Core" — from Settings → Shopify). Internal / test entries may be
+sent to Shopify when the box is ticked; they get "(Test)" after the name and a "Test" tag. Never cancel,
+refund or delete any other Shopify order, never change Shopify stock or prices, and never send customer
+emails by default.

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import SettingsTabs from "@/components/SettingsTabs";
 import { mutate } from "swr";
-import { syncShopifyNow } from "../actions";
+import { removeCoreTestOrder, syncShopifyNow } from "../actions";
 import { dateTime } from "@/lib/format";
 import { isAdmin } from "@/lib/roles";
 import { safe } from "@/lib/safe";
-import { useMe, useSyncState } from "@/lib/store";
+import { useMe, useOrders, useSyncState } from "@/lib/store";
+import { money } from "@/lib/format";
 
 const SHOP = "xd1uww-uu.myshopify.com";
 
@@ -17,6 +18,11 @@ export default function SettingsPage() {
   const { data: sync } = useSyncState(admin);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; message?: string } | null>(null);
+  const { data: orders } = useOrders();
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [rm, setRm] = useState<{ ok: boolean; message?: string } | null>(null);
+  // Orders Core itself created in Shopify, plus Core-only entries marked Internal / test.
+  const made = (orders ?? []).filter((o) => (o.tags ?? []).includes("Kaleidoscope Core") || (!o.shopify_id && o.is_internal && o.source === "Manual"));
   if (me && !admin) return <p className="empty">Only owners and admins manage Shopify.</p>;
 
   return (
@@ -81,6 +87,45 @@ export default function SettingsPage() {
         </button>
       </div>
       {msg && <p className={msg.ok ? "success" : "error"}>{msg.message}</p>}
+    </div>
+    <div className="panel">
+      <h2>Orders made from Core</h2>
+      <p className="hint">
+        Orders that Core created in Shopify, and Core-only test entries. <b>Cancel &amp; remove</b> cancels the order in Shopify (no
+        refund, no email, stock put back), deletes it there, and removes it from Core. This cannot be undone. Orders placed on the
+        website or made in Shopify admin never appear here.
+      </p>
+      <div className="master-list">
+        {made.map((o) => (
+          <div key={o.id} className="master-row">
+            <span className="master-name">
+              {o.order_number ?? "Core only"} · {o.customer_name}
+              {o.is_internal ? " · test" : ""}
+            </span>
+            <span className="meta">
+              {money(Number(o.total ?? 0))} · {o.status}
+            </span>
+            <span className="master-actions">
+              <button
+                className="btn small"
+                disabled={removing !== null}
+                onClick={async () => {
+                  if (!confirm(`Cancel and permanently remove ${o.order_number ?? "this entry"} (${o.customer_name})? This cannot be undone.`)) return;
+                  setRemoving(o.id);
+                  const r = (await safe(() => removeCoreTestOrder(o.id))) as { ok: boolean; message?: string };
+                  await mutate("orders");
+                  setRemoving(null);
+                  setRm(r);
+                }}
+              >
+                {removing === o.id ? "Removing…" : "Cancel & remove"}
+              </button>
+            </span>
+          </div>
+        ))}
+        {orders && !made.length && <p className="hint">Nothing here: no orders made from Core at the moment.</p>}
+      </div>
+      {rm && <p className={rm.ok ? "success" : "error"}>{rm.message}</p>}
     </div>
     </>
   );

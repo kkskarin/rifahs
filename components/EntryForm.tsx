@@ -144,10 +144,6 @@ export default function EntryForm({ order }: { order?: Order }) {
           return setMsg({ ok: false, text: r.message ?? "Couldn't save" });
         }
         if (!order?.shopify_id && b("to_shopify")) {
-          if (b("is_internal")) {
-            setBusy(false);
-            return setMsg({ ok: true, id: r.id, text: "Saved in Core. It was NOT sent to Shopify because it is marked Internal / test." });
-          }
           const s = (await safe(() => pushOrderToShopify(r.id!))) as { ok: boolean; message?: string };
           await mutate("orders");
           if (!s.ok) {
@@ -157,7 +153,7 @@ export default function EntryForm({ order }: { order?: Order }) {
         }
         setBusy(false);
         if (!order) return router.replace(`/order?id=${r.id}`);
-        setMsg({ ok: true, text: b("to_shopify") && !b("is_internal") ? "Saved, and created in Shopify." : "Saved" });
+        setMsg({ ok: true, text: b("to_shopify") ? "Saved, and created in Shopify." : "Saved" });
       }}
     >
       <h2>{order ? "Order details" : "New order"}</h2>
@@ -451,7 +447,7 @@ export default function EntryForm({ order }: { order?: Order }) {
           <label className="checkbox">
             <input type="checkbox" name="is_exchange" defaultChecked={order?.is_exchange} /> Exchange
           </label>
-          <label className="checkbox" title="Staff / test orders: never counted, and never sent to Shopify">
+          <label className="checkbox" title="Staff / test orders: never counted in sales. If sent to Shopify, the name gets (Test)">
             <input type="checkbox" name="is_internal" defaultChecked={order?.is_internal} /> Internal / test order
           </label>
         </div>
@@ -459,7 +455,7 @@ export default function EntryForm({ order }: { order?: Order }) {
 
       {!order?.shopify_id && (
         <label className="checkbox" style={{ marginTop: 16 }}>
-          <input type="checkbox" name="to_shopify" defaultChecked={!order || OPEN_STATUSES.includes(order.status)} /> Also create this order in Shopify (no email to the customer; not for Internal / test orders)
+          <input type="checkbox" name="to_shopify" defaultChecked={!order || OPEN_STATUSES.includes(order.status)} /> Also create this order in Shopify (no email to the customer; an Internal / test order is sent with “(Test)” after the name)
         </label>
       )}
       {msg && <p className={msg.ok ? "success" : "error"}>{msg.text}</p>}

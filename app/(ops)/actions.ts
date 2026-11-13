@@ -5,7 +5,7 @@
 // a new manual order, customer details, a size change, and marking an order fulfilled.
 import { requireAdmin, requireMember } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { changeLineSize, createShopifyOrder, fulfillOrder, shopifyConfigured, updateOrderDetails } from "@/lib/shopify";
+import { CORE_TAG, cancelAndDeleteCoreOrder, changeLineSize, createShopifyOrder, fulfillOrder, shopifyConfigured, updateOrderDetails } from "@/lib/shopify";
 import { syncBudgetMs, syncRecent, syncStock } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
 import type { OrderItem, TeamRole } from "@/lib/types";
@@ -85,7 +85,6 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
   const { data: o } = await db.from("orders").select("*").eq("id", orderId).single();
   if (!o) return { ok: false, message: "Order not found" };
   if (o.shopify_id) return { ok: false, message: `Already in Shopify as ${o.order_number}` };
-  if (o.is_internal) return { ok: false, message: "Internal / test entries aren't sent to Shopify." };
   const items = (o.items ?? []) as OrderItem[];
   if (!items.length) return { ok: false, message: "Add at least one item before sending to Shopify." };
   const total = Number(o.total ?? 0);
@@ -103,7 +102,8 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
 
   try {
     const r = await createShopifyOrder({
-      name: o.customer_name,
+      // Test entries are marked so nobody mistakes them for a sale.
+      name: o.is_internal && !/\(test\)\s*$/i.test(o.customer_name) ? `${o.customer_name} (Test)` : o.customer_name,
       email: o.customer_email,
       phone: o.customer_phone,
       address: o.ship_address ?? (o.ship_city ? { city: o.ship_city, country: o.ship_country } : null),
@@ -113,7 +113,7 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
       shipping,
       paid: fullyPaid,
       note: [o.notes ?? "", paymentNote].filter(Boolean).join("\n"),
-      tags: ["Kaleidoscope Core", o.channel, o.is_express ? "Express" : "", o.is_exchange ? "Exchange" : ""].filter(Boolean),
+      tags: [CORE_TAG, o.is_internal ? "Test" : "", o.channel, o.is_express ? "Express" : "", o.is_exchange ? "Exchange" : ""].filter(Boolean),
     });
     await db
       .from("orders")
@@ -212,5 +212,35 @@ export async function lookupPin(pin: string): Promise<PinResult> {
     return { ok: true, state: o.State, district: o.District, city: block || o.District, areas: [...new Set(offices.map((x) => x.Name))] };
   } catch {
     return { ok: false };
+  }
+}
+
+// ───────────────────────── Remove a test order made in Core ─────────────────────────
+
+/** Owner/admin only, and only for orders Core itself created: cancel + delete in Shopify, then remove from Core. */
+export async function removeCoreTestOrder(orderId: string): Promise<ActionResult> {
+  const me = await requireAdmin();
+  const db = supabaseAdmin();
+  const { data: o } = await db.from("orders").select("id, shopify_id, order_number, tags, source").eq("id", orderId).single();
+  if (!o) return { ok: false, message: "Order not found" };
+  if (!o.shopify_id) {
+    if (o.source !== "Manual") return { ok: false, message: "Only entries made in Core can be removed here." };
+    await db.from("orders").delete().eq("id", orderId);
+    return { ok: true, message: "Removed from Core." };
+  }
+  if (!(o.tags ?? []).includes(CORE_TAG)) return { ok: false, message: `${o.order_number} was not created from Core, so it is left alone.` };
+  if (!shopifyConfigured()) return { ok: false, message: "Shopify isn't connected." };
+  try {
+    const r = await cancelAndDeleteCoreOrder(o.shopify_id);
+    if (r.deleted) {
+      await db.from("orders").delete().eq("id", orderId);
+      return { ok: true, message: `${o.order_number}: ${r.message} Removed from Core.` };
+    }
+    // Still exists in Shopify (cancelled): keep it in Core as a cancelled test so the sync doesn't bring it back as new.
+    await db.from("orders").update({ status: "cancelled", is_internal: true, updated_by: me.id }).eq("id", orderId);
+    await db.from("order_events").insert({ order_id: orderId, kind: "shopify_sync", to_status: "cancelled", message: r.message, actor: me.id });
+    return { ok: false, message: `${o.order_number}: ${r.message}. It is kept in Core as a cancelled test order; delete it in Shopify admin (order → More actions → Delete order) and then here.` };
+  } catch (e) {
+    return { ok: false, message: `${o.order_number}: Shopify refused: ${(e as Error).message.replace(/^Shopify API error: /, "").slice(0, 200)}` };
   }
 }
