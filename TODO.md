@@ -7,3 +7,18 @@
 5. ~~Add sales order: selectable items~~ (done on preview: item table, sizes, custom pricing, GST, shipping) — pick the product and its variant from a list, with an option
    for custom pricing; add shipping charges (currently missing from the entry form).
 6. ~~"Add to Home Screen" has no logo~~ — done (round logo on cream; on preview).
+7. **Inventory stages + Shopify stock from Core** (rule agreed 13 Nov 2026 — owner will give permission
+   later; do NOT write Shopify stock until then).
+   - Stages, each physical piece in exactly one: Waiting for fabric (ordered from vendor) → Unstitched
+     stock (main stock) → At stitching → Ready for dispatch (stitched, by size).
+   - Order-side figures: Uncommitted orders (ordered, not yet sent for stitching); Short by
+     (uncommitted orders beyond unstitched stock).
+   - Pieces move with order status: Stitching → Unstitched to At stitching; QC/Ready → Ready for
+     dispatch; Dispatched → leaves stock. Manual +/− stays for corrections.
+   - Shopify: sellable = unstitched stock we HOLD minus uncommitted orders (fabric on the way is NOT
+     sellable). Core sets every size and Unstitched to that number, and lowers all together when any
+     size is ordered; a ready-stitched piece adds to its own size only.
+   - Have Shopify notify Core on each new order so the numbers update within seconds.
+   - Build first as a "what Core would set vs what Shopify shows" list for the owner to check, then
+     switch on real updates. This reverses the earlier "Core never changes Shopify stock" rule, so
+     update CLAUDE.md when permission is given.
