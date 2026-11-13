@@ -1,10 +1,20 @@
 import type { NextConfig } from "next";
+import { writeFileSync } from "node:fs";
+
+// The commit this build is made from. Also written to /version.json (a plain public file, no login needed)
+// so an open app can tell when a newer build has been published and offer a reload.
+const COMMIT = (process.env.COMMIT_REF ?? "local").slice(0, 7);
+try {
+  writeFileSync("public/version.json", JSON.stringify({ commit: COMMIT }));
+} catch {}
+
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Shown in the ☰ menu so anyone can tell which build their device is running.
   env: {
-    NEXT_PUBLIC_BUILD: `${(process.env.COMMIT_REF ?? "local").slice(0, 7)} · ${new Date().toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}`,
+    NEXT_PUBLIC_COMMIT: COMMIT,
+    NEXT_PUBLIC_BUILD: `${COMMIT} · ${new Date().toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}`,
   },
   images: { remotePatterns: [{ protocol: "https", hostname: "cdn.shopify.com" }] },
   async redirects() {

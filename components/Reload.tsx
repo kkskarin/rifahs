@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const MINE = process.env.NEXT_PUBLIC_BUILD ?? "";
+const MINE = process.env.NEXT_PUBLIC_COMMIT ?? "";
 const reload = () => window.location.reload();
 
 /** Menu button: load the newest version of the app (a home-screen app has no browser reload button). */
@@ -22,9 +22,9 @@ export function UpdateBar() {
     const check = async () => {
       if (document.visibilityState !== "visible") return;
       try {
-        const r = await fetch("/api/version", { cache: "no-store" });
-        const { build } = (await r.json()) as { build?: string };
-        if (!stop && build && MINE && build !== MINE) setNewer(true);
+        const r = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+        const { commit } = (await r.json()) as { commit?: string };
+        if (!stop && commit && MINE && commit !== MINE) setNewer(true);
       } catch {}
     };
     check();
