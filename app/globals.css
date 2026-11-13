@@ -709,3 +709,13 @@ span.status-select { display: inline-block; white-space: nowrap; }
   .subnav-row .tabs { flex: 1 0 100%; min-width: 0; }
   .subnav-row > span { margin-left: auto; }
 }
+
+/* Settings → Roles */
+.role-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 14px; }
+.role-group { border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px 12px; margin: 0; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.role-group legend { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); padding: 0 6px; }
+.role-group .hint { margin: 0; font-size: 12.5px; }
+.role-group .checkbox { align-items: flex-start; line-height: 1.35; }
+.role-group .checkbox input { margin-top: 2px; flex: none; }
+/* Inventory for a role that can look but not change */
+.card.inv.no-edit .stepper button, .card.inv.no-edit .advance, .card.inv.no-edit .size-chip button, .card.inv.no-edit select { display: none; }

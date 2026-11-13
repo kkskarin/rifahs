@@ -7,7 +7,7 @@ import { saveVendor } from "@/lib/money";
 import type { Profile } from "@/lib/types";
 import { money, shortDate, todayIST } from "@/lib/format";
 import { addExpense, categoryLabel, categoryTree, downloadExpensesCsv, useExpenseCategories, useVendors } from "@/lib/money";
-import { isAdmin } from "@/lib/roles";
+import { useCan } from "@/lib/perms";
 import { deleteExpense, useExpenses, useMe } from "@/lib/store";
 
 type Period = "this-month" | "last-month" | "3-months" | "fy" | "all" | "custom";
@@ -39,7 +39,7 @@ function periodRange(p: Period, from: string, to: string): [string, string] {
 
 export default function ExpensesPage() {
   const { data: me } = useMe();
-  const admin = me ? isAdmin(me) : false;
+  const admin = useCan().can("purchase");
   const { data: expenses } = useExpenses(admin);
   const { data: cats } = useExpenseCategories();
   const { data: vendors } = useVendors();

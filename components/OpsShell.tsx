@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ReloadButton, UpdateBar } from "@/components/Reload";
+import { permForPath, useCan, type PermKey } from "@/lib/perms";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isAdmin } from "@/lib/roles";
@@ -11,20 +12,20 @@ import { setViewAs, signOutEverywhere, useMe, useRealMe, useTeam } from "@/lib/s
 
 export const APP_NAME = "Kaleidoscope · Core";
 
-type Header = { label: string; href: string; match: string[]; adminOnly?: boolean };
+type Header = { label: string; href: string; match: string[]; perms: PermKey[] };
 export const HEADERS: Header[] = [
   // Sales holds All Sales, Order Status and Disputes as sub-tabs (components/SalesNav.tsx).
-  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order", "/status", "/disputes"] },
+  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order", "/status", "/disputes"], perms: ["sales_all", "sales_status", "sales_disputes", "stitching"] },
   // "Purchase" is the expenses book (what was spent, on what, to whom).
-  { label: "Purchase", href: "/expenses", match: ["/expenses"], adminOnly: true },
-  { label: "Inventory", href: "/inventory", match: ["/inventory"] },
-  { label: "Reports", href: "/reports", match: ["/reports"], adminOnly: true },
-  { label: "Masters", href: "/masters", match: ["/masters"] },
+  { label: "Purchase", href: "/expenses", match: ["/expenses"], perms: ["purchase"] },
+  { label: "Inventory", href: "/inventory", match: ["/inventory"], perms: ["inventory"] },
+  { label: "Reports", href: "/reports", match: ["/reports"], perms: ["reports"] },
+  { label: "Masters", href: "/masters", match: ["/masters"], perms: ["masters"] },
 ];
 
 
 
-const SETTINGS_PATHS = ["/team", "/templates", "/settings", "/personalise"];
+const SETTINGS_PATHS = ["/team", "/roles", "/templates", "/settings", "/personalise"];
 const nameFromEmail = (e: string) => {
   const n = e.split("@")[0].split(/[._\-+0-9]/)[0];
   return n ? n[0].toUpperCase() + n.slice(1) : e;
@@ -85,7 +86,12 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   }, [menu]);
 
   const isPreview = typeof window !== "undefined" && window.location.hostname.startsWith("preview--");
-  const headers = HEADERS.filter((h) => !h.adminOnly || admin);
+  // Tabs follow the person's role (Settings → Roles). Sales opens on the first sub-tab they may see.
+  const { can, ready } = useCan();
+  const SALES_SUB: [PermKey, string][] = [["sales_all", "/orders"], ["sales_status", "/status"], ["sales_disputes", "/disputes"], ["stitching", "/stitching"]];
+  const headers = HEADERS.filter((h) => h.perms.some(can)).map((h) => (h.label === "Sales" ? { ...h, href: SALES_SUB.find(([k]) => can(k))?.[1] ?? h.href } : h));
+  const need = permForPath(path);
+  const allowed = !need || can(need);
 
   return (
     <>
@@ -165,7 +171,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
 
       <UpdateBar />
       <main className="page">
-        <Suspense fallback={<p className="empty">Loading…</p>}>{me ? children : <p className="empty">Loading…</p>}</Suspense>
+        <Suspense fallback={<p className="empty">Loading…</p>}>{!me || !ready ? <p className="empty">Loading…</p> : allowed ? children : <p className="empty">Your role doesn&apos;t include this page. Ask the owner if you need it.</p>}</Suspense>
       </main>
     </>
   );

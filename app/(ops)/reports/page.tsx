@@ -4,16 +4,17 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { money } from "@/lib/format";
 import { useExpenseCategories } from "@/lib/money";
-import { isAdmin } from "@/lib/roles";
+import { useCan } from "@/lib/perms";
 import { countsAsSale, useExpenses, useMe, useOrders } from "@/lib/store";
 
 const monthKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0, 7); // YYYY-MM in IST
 
 export default function ReportsPage() {
   const { data: me } = useMe();
-  const admin = me ? isAdmin(me) : false;
+  const { can } = useCan();
+  const admin = can("reports");
   const { data: orders } = useOrders();
-  const { data: expenses } = useExpenses(admin);
+  const { data: expenses } = useExpenses(can("purchase"));
   const { data: cats } = useExpenseCategories();
 
 

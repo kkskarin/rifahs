@@ -28,12 +28,18 @@ export async function createInvite(input: { name: string; email: string; role: s
   }
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
-  const role = input.role as TeamRole;
+  // "custom:<key>" is a role made in Settings → Roles: the person is Staff underneath, with that role's access.
+  const roleKey = input.role.startsWith("custom:") ? input.role.slice(7) : null;
+  const role = (roleKey ? "staff" : input.role) as TeamRole;
   if (!name) return { ok: false, message: "Enter their name" };
   if (!validEmail(email)) return { ok: false, message: "Enter a valid email" };
   if (!ROLES.includes(role)) return { ok: false, message: "Choose a role" };
 
   const admin = supabaseAdmin();
+  if (roleKey) {
+    const { data: r } = await admin.from("roles").select("key").eq("key", roleKey).maybeSingle();
+    if (!r) return { ok: false, message: "That role no longer exists" };
+  }
   const { data: existing } = await admin.from("profiles").select("id, active").eq("email", email).maybeSingle();
   let userId = existing?.id as string | undefined;
 
@@ -56,7 +62,7 @@ export async function createInvite(input: { name: string; email: string; role: s
     }
   }
   if (!userId) return { ok: false, message: "Couldn't create the account" };
-  await admin.from("profiles").upsert({ id: userId, email, full_name: name, role, active: true }, { onConflict: "id" });
+  await admin.from("profiles").upsert({ id: userId, email, full_name: name, role, role_key: roleKey, active: true }, { onConflict: "id" });
 
   try {
     const r = await issueLink({

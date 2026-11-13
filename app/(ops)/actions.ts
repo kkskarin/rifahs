@@ -43,13 +43,21 @@ export async function inviteMember(_: ActionResult | null, form: FormData): Prom
   return { ok: true, message: `${email} can now sign in at ${await siteUrl()}` };
 }
 
-export async function updateMember(id: string, patch: { role?: TeamRole; active?: boolean }): Promise<ActionResult> {
+export async function updateMember(id: string, patch: { role?: TeamRole; role_key?: string | null; active?: boolean }): Promise<ActionResult> {
   const me = await requireAdmin();
   if (id === me.id) return { ok: false, message: "You can't change your own access" };
   const admin = supabaseAdmin();
   const { data: target } = await admin.from("profiles").select("role").eq("id", id).single();
   if ((target?.role === "owner" || patch.role === "owner") && me.role !== "owner")
     return { ok: false, message: "Only the owner can change an owner" };
+  if (patch.role_key !== undefined && patch.role_key !== null && me.role !== "owner") return { ok: false, message: "Only the owner can give someone a custom role" };
+  // Moving to a built-in role always clears any custom role.
+  if (patch.role && patch.role_key === undefined) patch = { ...patch, role_key: null };
+  if (patch.role_key) {
+    const { data: r } = await admin.from("roles").select("key").eq("key", patch.role_key).maybeSingle();
+    if (!r) return { ok: false, message: "That role no longer exists" };
+    patch = { ...patch, role: "staff" };
+  }
   const { error } = await admin.from("profiles").update(patch).eq("id", id);
   if (error) return { ok: false, message: error.message };
   if (patch.active === false) await admin.auth.admin.signOut(id).catch(() => undefined);

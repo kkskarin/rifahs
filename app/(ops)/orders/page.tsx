@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/perms";
 import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -33,6 +34,7 @@ export default function OrdersPage() {
   const q = sp.get("q") ?? "";
   const { data: all, error } = useOrders();
   const { data: me } = useMe();
+  const { can } = useCan();
   const rules = useDueRules();
   const [view, setViewState] = useState<View>(DEFAULT_VIEW);
   const [showRules, setShowRules] = useState(false);
@@ -91,9 +93,11 @@ export default function OrdersPage() {
       <SalesNav />
       <div className="toolbar">
         <SearchBox />
-        <button className="btn ghost" onClick={() => downloadOrdersCsv(list, f)} disabled={!all}>
-          Download CSV
-        </button>
+        {can("see_amounts") && can("see_contact") && (
+          <button className="btn ghost" onClick={() => downloadOrdersCsv(list, f)} disabled={!all}>
+            Download CSV
+          </button>
+        )}
       </div>
       <nav className="chips" aria-label="Express and international">
         <Link className="chip" href="/express">
@@ -213,7 +217,9 @@ function RulesForm({ userId, onDone }: { userId: string; onDone: () => void }) {
 
 function OrderTable({ orders }: { orders: Order[] }) {
   const rules = useDueRules();
-  const { data: me } = useMe();
+  const { data: meRaw } = useMe();
+  const { can } = useCan();
+  const me = can("edit_orders") ? meRaw : undefined;
   const [limit, setLimit] = useState(150);
   if (!orders.length) return <p className="empty">Nothing here — all caught up.</p>;
   return (
@@ -231,7 +237,7 @@ function OrderTable({ orders }: { orders: Order[] }) {
                 <th>Items</th>
                 <th>Due by</th>
                 <th>Status</th>
-                <th className="n">Amount</th>
+                {can("see_amounts") && <th className="n">Amount</th>}
                 <th />
               </tr>
             </thead>
@@ -251,9 +257,11 @@ function OrderTable({ orders }: { orders: Order[] }) {
                     <td data-label="Status">
                       <span className={`pill ${o.status}`}>{STATUS_LABEL[o.status]}</span>
                     </td>
-                    <td className="n" data-label="Amount">
-                      {money(o.total, o.currency)}
-                    </td>
+                    {can("see_amounts") && (
+                      <td className="n" data-label="Amount">
+                        {money(o.total, o.currency)}
+                      </td>
+                    )}
                     <td className="stack-actions">
                       {me && next && next !== "dispatched" && (
                         <button className="link" onClick={() => setStatus(me, [o], "next")}>

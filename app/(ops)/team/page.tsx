@@ -1,5 +1,6 @@
 "use client";
 
+import { useRoles } from "@/lib/perms";
 import { useState } from "react";
 import SettingsTabs from "@/components/SettingsTabs";
 import useSWR, { mutate } from "swr";
@@ -55,6 +56,7 @@ export default function TeamPage() {
   const owner = me?.role === "owner";
   const { data: people } = useTeam(admin);
   const { data: invites } = useInvites(admin);
+  const { data: inviteRoles } = useRoles();
   const [result, setResult] = useState<LinkResult | null>(null);
   const [busy, setBusy] = useState(false);
   if (me && !admin) return <p className="empty">Only owners and admins can see the team.</p>;
@@ -101,9 +103,14 @@ export default function TeamPage() {
                 <option value="" disabled>
                   Choose…
                 </option>
-                <option value="staff">Staff — orders, inventory, issues (no money)</option>
-                <option value="admin">Admin — everything incl. money and settings</option>
-                <option value="owner">Owner — everything, plus inviting people</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin — can also manage the team and Shopify</option>
+                {(inviteRoles ?? []).filter((r) => !r.builtin).map((r) => (
+                  <option key={r.key} value={`custom:${r.key}`}>
+                    {r.name}
+                  </option>
+                ))}
+                <option value="owner">Owner — everything, always</option>
               </select>
             </label>
           </div>
@@ -146,7 +153,9 @@ export default function TeamPage() {
 function Row({ p, me, pending, owner, onLink }: { p: Profile; me: Profile; pending?: Invite; owner: boolean; onLink: (r: LinkResult) => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const run = async (patch: { role?: TeamRole; active?: boolean }) => {
+  const { data: roles } = useRoles();
+  const custom = (roles ?? []).filter((r) => !r.builtin);
+  const run = async (patch: { role?: TeamRole; role_key?: string | null; active?: boolean }) => {
     setBusy(true);
     const r = (await safe(() => updateMember(p.id, patch))) as { ok: boolean; message?: string };
     setBusy(false);
@@ -182,13 +191,28 @@ function Row({ p, me, pending, owner, onLink }: { p: Profile; me: Profile; pendi
       <td data-label="Email">{p.email}</td>
       <td data-label="Role">
         {canEdit && p.active ? (
-          <select aria-label="Role" defaultValue={p.role} disabled={busy} onChange={(e) => run({ role: e.target.value as TeamRole })} style={{ padding: "4px 6px" }}>
+          <select
+            aria-label="Role"
+            key={`${p.role}:${p.role_key ?? ""}`}
+            defaultValue={p.role_key ? `custom:${p.role_key}` : p.role}
+            disabled={busy || (!owner && Boolean(p.role_key))}
+            onChange={(e) => {
+              const v = e.target.value;
+              run(v.startsWith("custom:") ? { role: "staff", role_key: v.slice(7) } : { role: v as TeamRole, role_key: null });
+            }}
+            style={{ padding: "4px 6px" }}
+          >
             <option value="staff">Staff</option>
             <option value="admin">Admin</option>
+            {(owner || p.role_key) && custom.map((r) => (
+              <option key={r.key} value={`custom:${r.key}`}>
+                {r.name}
+              </option>
+            ))}
             {owner && <option value="owner">Owner</option>}
           </select>
         ) : (
-          <span style={{ textTransform: "capitalize" }}>{p.role}</span>
+          <span style={{ textTransform: "capitalize" }}>{p.role_key ? (roles?.find((r) => r.key === p.role_key)?.name ?? p.role_key) : p.role}</span>
         )}
       </td>
       <td className="hint" data-label="Status">{status}</td>

@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { money } from "@/lib/format";
-import { isAdmin } from "@/lib/roles";
+import { useCan } from "@/lib/perms";
 import { summarize, useExpenses, useIssues, useMe, useOrders } from "@/lib/store";
 
 /** Sub-navigation + key numbers for the Sales header. */
 export default function SalesNav() {
   const path = usePathname();
   const { data: me } = useMe();
-  const admin = me ? isAdmin(me) : false;
+  const { can } = useCan();
+  const admin = can("purchase");
   const { data: orders } = useOrders();
   const { data: expenses } = useExpenses(admin);
   const { data: issues } = useIssues();
@@ -20,16 +21,18 @@ export default function SalesNav() {
   const dash = (v: string | number) => (orders ? v : "…");
 
   const SALES_PATHS = ["/orders", "/order", "/orders/new", "/express", "/international", "/stitching"];
-  const tabs: { href: string; label: string; n?: number; hot?: boolean; on: boolean }[] = [
-    { href: "/orders", label: "All Sales", n: all, on: SALES_PATHS.includes(path) },
-    { href: "/status", label: "Order Status", on: path === "/status" },
-    { href: "/disputes", label: "Disputes", n: openIssues, hot: openIssues > 0, on: path === "/disputes" },
-  ];
+  const tabs = (
+    [
+      { href: "/orders", label: "All Sales", n: all, on: SALES_PATHS.includes(path), perm: "sales_all" },
+      { href: "/status", label: "Order Status", on: path === "/status", perm: "sales_status" },
+      { href: "/disputes", label: "Disputes", n: openIssues, hot: openIssues > 0, on: path === "/disputes", perm: "sales_disputes" },
+    ] as { href: string; label: string; n?: number; hot?: boolean; on: boolean; perm: "sales_all" | "sales_status" | "sales_disputes" }[]
+  ).filter((t) => can(t.perm));
 
   return (
     <>
       <section className="stats" aria-label="Summary">
-        {admin && (
+        {can("see_sales_total") && (
           <div className="stat">
             <div className="label">Sales</div>
             <div className="value">{dash(money(s.sales))}</div>
@@ -43,7 +46,7 @@ export default function SalesNav() {
           <div className="label">Express due</div>
           <div className="value">{dash(s.expressDue)}</div>
         </div>
-        <Link href="/disputes" className="stat" style={{ textDecoration: "none" }}>
+        <Link href={can("sales_disputes") ? "/disputes" : "#"} className="stat" style={{ textDecoration: "none" }}>
           <div className="label">Open disputes</div>
           <div className="value">{issues ? openIssues : "…"}</div>
         </Link>
@@ -58,12 +61,16 @@ export default function SalesNav() {
           ))}
         </nav>
         <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Link href="/stitching" className="btn ghost small" aria-current={path === "/stitching" ? "page" : undefined}>
-            Stitching queue
-          </Link>
-          <Link href="/orders/new" className="btn primary small">
-            + Add entry
-          </Link>
+          {can("stitching") && (
+            <Link href="/stitching" className="btn ghost small" aria-current={path === "/stitching" ? "page" : undefined}>
+              Stitching queue
+            </Link>
+          )}
+          {can("sales_all") && can("edit_orders") && (
+            <Link href="/orders/new" className="btn primary small">
+              + Add entry
+            </Link>
+          )}
         </span>
       </div>
     </>

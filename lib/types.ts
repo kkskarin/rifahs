@@ -5,6 +5,8 @@ export type Profile = {
   email: string;
   full_name: string;
   role: TeamRole;
+  /** A custom role from Settings → Roles (the base role is then "staff"). */
+  role_key?: string | null;
   active: boolean;
   created_at: string;
   avatar_url?: string | null;

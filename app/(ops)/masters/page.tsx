@@ -7,7 +7,7 @@ import { CategoryMaster, VendorMaster } from "@/components/MoneyMasters";
 import { mutate } from "swr";
 import ProductForm from "@/components/ProductForm";
 import { useProducts } from "@/lib/inventory";
-import { isAdmin } from "@/lib/roles";
+import { useCan } from "@/lib/perms";
 import { useMe } from "@/lib/store";
 import { sb } from "@/lib/supabase-browser";
 import type { Product } from "@/lib/types";
@@ -32,10 +32,12 @@ export default function MastersPage() {
   };
 
   const tab = useSearchParams().get("m") ?? "designs";
-  const admin = me ? isAdmin(me) : false;
+  const { can } = useCan();
+  const admin = can("edit_masters");
+  const money = can("purchase");
   const TABS = [
     { key: "designs", label: "Designs" },
-    ...(admin ? [{ key: "categories", label: "Expense categories" }] : []),
+    ...(money ? [{ key: "categories", label: "Expense categories" }] : []),
     { key: "vendors", label: "Vendors" },
   ];
   const head = (
@@ -53,7 +55,7 @@ export default function MastersPage() {
       </nav>
     </>
   );
-  if (tab === "categories" && admin) return <>{head}<CategoryMaster canEdit={admin} /></>;
+  if (tab === "categories" && money) return <>{head}<CategoryMaster canEdit={admin} /></>;
   if (tab === "vendors") return <>{head}<VendorMaster canEdit={admin} /></>;
 
   return (
@@ -115,7 +117,7 @@ export default function MastersPage() {
                       <button className="link" onClick={() => setEditing(p)}>
                         Edit
                       </button>{" "}
-                      {me && isAdmin(me) && (
+                      {me && admin && (
                         <button className="link" onClick={() => setActive(p, !p.active)}>
                           {p.active ? "Archive" : "Restore"}
                         </button>

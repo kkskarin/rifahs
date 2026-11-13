@@ -8,10 +8,14 @@ import { safe } from "@/lib/safe";
 import { dueInfo, useDueRules } from "@/lib/due";
 import { itemsLine, money, shortDate } from "@/lib/format";
 import { dispatch, setStatus, useMe } from "@/lib/store";
+import { useCan } from "@/lib/perms";
 import { COURIERS, OPEN_STATUSES, STATUSES, STATUS_LABEL, nextStatus, type Order, type OrderStatus } from "@/lib/types";
 
 export default function OrderList({ orders, showNotes = true }: { orders: Order[]; showNotes?: boolean }) {
-  const { data: me } = useMe();
+  const { data: meRaw } = useMe();
+  const { can } = useCan();
+  // Without "edit orders" the person can look but the action buttons are not offered.
+  const me = can("edit_orders") ? meRaw : undefined;
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkTo, setBulkTo] = useState<OrderStatus | "next">("next");
@@ -36,15 +40,17 @@ export default function OrderList({ orders, showNotes = true }: { orders: Order[
         <span className="hint">
           {orders.length} order{orders.length === 1 ? "" : "s"}
         </span>
-        <button
-          className="btn small ghost"
-          onClick={() => {
-            setSelecting(!selecting);
-            setSelected(new Set());
-          }}
-        >
-          {selecting ? "Done" : "Select"}
-        </button>
+        {me && (
+          <button
+            className="btn small ghost"
+            onClick={() => {
+              setSelecting(!selecting);
+              setSelected(new Set());
+            }}
+          >
+            {selecting ? "Done" : "Select"}
+          </button>
+        )}
       </div>
 
       <div className="list">
@@ -107,7 +113,10 @@ const OrderCard = memo(function OrderCard({
   onToggle: (id: string) => void;
   showNotes: boolean;
 }) {
-  const { data: me } = useMe();
+  const { data: meRaw } = useMe();
+  const { can } = useCan();
+  // Without "edit orders" the person can look but the action buttons are not offered.
+  const me = can("edit_orders") ? meRaw : undefined;
   const [dispatching, setDispatching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const next = nextStatus(o.status);
@@ -123,7 +132,7 @@ const OrderCard = memo(function OrderCard({
           <span className="name">{o.customer_name}</span>
           {o.order_number && <span className="num">{o.order_number}</span>}
         </div>
-        <span className="amt">{money(o.total, o.currency)}</span>
+        {can("see_amounts") && <span className="amt">{money(o.total, o.currency)}</span>}
       </div>
       {open && (
         <div className={`due due-${due.level}`} title={due.promised ? "Promised date" : "Order date + standard time"}>
@@ -183,6 +192,13 @@ const OrderCard = memo(function OrderCard({
             Edit
           </Link>
           {err && <span className="error">{err}</span>}
+        </div>
+      )}
+      {!me && (
+        <div className="actions">
+          <Link href={`/order?id=${o.id}`} className="link">
+            Open
+          </Link>
         </div>
       )}
       {dispatching && <DispatchForm o={o} onClose={() => setDispatching(false)} />}

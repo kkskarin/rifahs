@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { demandByProduct, useProducts } from "@/lib/inventory";
 import { money } from "@/lib/format";
-import { isAdmin } from "@/lib/roles";
+import { useCan } from "@/lib/perms";
 import { countsAsSale, summarize, useExpenses, useIssues, useMe, useOrders } from "@/lib/store";
 
 function greeting() {
@@ -14,7 +14,8 @@ function greeting() {
 
 export default function Home() {
   const { data: me } = useMe();
-  const admin = me ? isAdmin(me) : false;
+  const { can } = useCan();
+  const admin = can("purchase");
   const { data: orders } = useOrders();
   const { data: expenses } = useExpenses(admin);
   const { data: issues } = useIssues();
@@ -30,11 +31,11 @@ export default function Home() {
   const d = (v: string | number, ready: unknown) => (ready ? v : "…");
 
   const tiles = [
-    { href: "/orders", title: "Sales", big: d(s.notDispatched, orders), note: "orders not dispatched", sub: `${d(s.expressDue, orders)} express due · ${d(openIssues, issues)} open disputes` },
+    ...(!can("sales_all") ? [] : [{ href: "/orders", title: "Sales", big: d(s.notDispatched, orders), note: "orders not dispatched", sub: `${d(s.expressDue, orders)} express due · ${d(openIssues, issues)} open disputes` }]),
     ...(admin ? [{ href: "/expenses", title: "Purchase", big: d(money(s.spent), orders && expenses), note: "spent so far", sub: "Fabric, stitching, transport and more" }] : []),
-    { href: "/inventory", title: "Inventory", big: d(short, products && orders), note: "designs short on fabric", sub: `${d((products ?? []).reduce((a, p) => a + p.in_stock, 0), products)} fabric sets in stock` },
-    ...(admin ? [{ href: "/reports", title: "Reports", big: d(money(monthSales), orders), note: "sales this month", sub: `${d(money(s.sales), orders)} all time` }] : []),
-    { href: "/masters", title: "Masters", big: d((products ?? []).filter((p) => p.active).length, products), note: "designs", sub: "Designs, expense categories, vendors" },
+    ...(!can("inventory") ? [] : [{ href: "/inventory", title: "Inventory", big: d(short, products && orders), note: "designs short on fabric", sub: `${d((products ?? []).reduce((a, p) => a + p.in_stock, 0), products)} fabric sets in stock` }]),
+    ...(can("reports") ? [{ href: "/reports", title: "Reports", big: d(money(monthSales), orders), note: "sales this month", sub: `${d(money(s.sales), orders)} all time` }] : []),
+    ...(!can("masters") ? [] : [{ href: "/masters", title: "Masters", big: d((products ?? []).filter((p) => p.active).length, products), note: "designs", sub: "Designs, expense categories, vendors" }]),
   ];
 
   return (

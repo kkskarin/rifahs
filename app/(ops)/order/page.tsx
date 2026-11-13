@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/perms";
 import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,6 +22,8 @@ export default function OrderPage() {
   const id = useSearchParams().get("id");
   const router = useRouter();
   const { data: me } = useMe();
+  const { can } = useCan();
+  const canEdit = can("edit_orders");
   const { data: orders } = useOrders();
   const { data: events } = useOrderEvents(id);
   const { data: issues } = useIssues();
@@ -59,9 +62,11 @@ export default function OrderPage() {
             <span style={{ fontSize: 22, fontFamily: "var(--serif)" }}>{o.customer_name}</span>
             {o.order_number && <span className="num"> {o.order_number}</span>}
           </div>
-          <span className="amt" style={{ fontFamily: "var(--serif)", fontSize: 20 }}>
-            {money(o.total, o.currency)}
-          </span>
+          {can("see_amounts") && (
+            <span className="amt" style={{ fontFamily: "var(--serif)", fontSize: 20 }}>
+              {money(o.total, o.currency)}
+            </span>
+          )}
         </div>
         <div className="card" style={{ boxShadow: "none", border: 0, padding: 0, background: "transparent" }}>
           <div className="row2">
@@ -76,10 +81,12 @@ export default function OrderPage() {
         {(addr || o.ship_city) && (
           <p className="hint" style={{ marginBottom: 0 }}>
             Ship to:{" "}
-            {addr
+            {!can("see_contact")
+              ? [o.ship_city, addr?.province, o.ship_country].filter(Boolean).join(", ")
+              : addr
               ? [addr.address1, addr.address2, addr.city, addr.province, addr.zip, addr.country].filter(Boolean).join(", ")
               : o.ship_city}
-            {o.customer_phone ? ` · ${o.customer_phone}` : ""}
+            {can("see_contact") && o.customer_phone ? ` · ${o.customer_phone}` : ""}
           </p>
         )}
         {o.shopify_id && (
@@ -89,7 +96,7 @@ export default function OrderPage() {
             </a>
           </p>
         )}
-        {!o.shopify_id && (
+        {!o.shopify_id && canEdit && (
           <p style={{ marginBottom: 0 }}>
             <button
               className="btn small"
@@ -107,7 +114,7 @@ export default function OrderPage() {
             {push.message && <span className={push.ok ? "success" : "error"}>{push.message}</span>}
           </p>
         )}
-        {!open && o.shopify_id && !o.shopify_fulfilled && (o.status === "dispatched" || o.status === "delivered") && (
+        {canEdit && !open && o.shopify_id && !o.shopify_fulfilled && (o.status === "dispatched" || o.status === "delivered") && (
           <div style={{ marginTop: 16, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
             <button
               className="btn small"
@@ -128,7 +135,7 @@ export default function OrderPage() {
             {ful.message && <span className={ful.ok ? "success" : "error"}>{ful.message}</span>}
           </div>
         )}
-        {open && (
+        {open && canEdit && (
           <>
             <h3 style={{ marginTop: 20, marginBottom: 0 }}>Dispatch</h3>
             <DispatchForm o={o} />
@@ -156,9 +163,9 @@ export default function OrderPage() {
                 <select
                   id={`size-${i}`}
                   value={it.size ?? ""}
-                  disabled={!me}
+                  disabled={!me || !canEdit}
                   onChange={async (e) => {
-                    if (!me) return;
+                    if (!me || !canEdit) return;
                     let v = e.target.value;
                     if (v === "__other") v = prompt("Size (e.g. 4XL, or custom measurements)") ?? "";
                     if (!v || v === (it.size ?? "")) return;
@@ -188,7 +195,12 @@ export default function OrderPage() {
         {sizeMsg.message && <p className={sizeMsg.ok ? "success" : "error"}>{sizeMsg.message}</p>}
       </div>
 
-      {o.shopify_id ? <OrderForm key={o.updated_at} order={o} /> : <EntryForm key={o.id} order={o} />}
+      {/* The edit form shows customer details and prices, so it needs all three permissions. */}
+      {canEdit && can("see_contact") && can("see_amounts") ? (
+        o.shopify_id ? <OrderForm key={o.updated_at} order={o} /> : <EntryForm key={o.id} order={o} />
+      ) : (
+        <p className="hint">Your role can view this order but not edit its details.</p>
+      )}
 
       <div className="panel">
         <h3>Activity</h3>

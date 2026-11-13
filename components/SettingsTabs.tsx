@@ -7,6 +7,7 @@ import { useMe } from "@/lib/store";
 
 const TABS = [
   { href: "/team", label: "Team", adminOnly: true },
+  { href: "/roles", label: "Roles", adminOnly: true, ownerOnly: true },
   { href: "/templates", label: "Templates", adminOnly: true },
   { href: "/settings", label: "Shopify", adminOnly: true },
   { href: "/personalise", label: "Personalise", adminOnly: false },
@@ -23,7 +24,7 @@ export default function SettingsTabs() {
         <h1>Settings</h1>
       </div>
       <nav className="tabs" aria-label="Settings">
-        {TABS.filter((t) => !t.adminOnly || admin).map((t) => (
+        {TABS.filter((t) => (!t.adminOnly || admin) && (!("ownerOnly" in t) || me?.role === "owner")).map((t) => (
           <Link key={t.href} href={t.href} className="tab" aria-current={path === t.href ? "page" : undefined}>
             {t.label}
           </Link>

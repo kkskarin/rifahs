@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/perms";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { dateTime } from "@/lib/format";
@@ -205,14 +206,16 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
   const [editing, setEditing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [newSize, setNewSize] = useState("");
+  const editable = useCan().can("edit_inventory");
   const run = async (changes: Parameters<typeof adjust>[1], reason: string) => {
+    if (!editable) return setErr("Your role can't change inventory.");
     const r = await adjust(p, changes, reason);
     setErr(r.ok ? null : r.message);
   };
   const stitched = p.stitched.filter((r) => r.qty > 0).sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size));
 
   return (
-    <article className="card inv">
+    <article className={`card inv${editable ? "" : " no-edit"}`}>
       <div className="row1">
         <div>
           <span className="name">{p.name}</span>

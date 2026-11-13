@@ -72,7 +72,7 @@ export function useMe() {
   const { data: target } = useSWR<Profile | null>("view-as", async () => readViewAs(), { revalidateOnFocus: false });
   const r = real.data;
   const data = r && target && r.role === "owner" && target.id !== r.id
-    ? { ...r, role: target.role, full_name: target.full_name, email: target.email, avatar_url: target.avatar_url, viewingAs: target.id }
+    ? { ...r, role: target.role, role_key: target.role_key ?? null, full_name: target.full_name, email: target.email, avatar_url: target.avatar_url, viewingAs: target.id }
     : r;
   return { ...real, data };
 }
