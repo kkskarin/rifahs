@@ -27,14 +27,17 @@ export default function Home() {
   const monthSales = (orders ?? [])
     .filter((o) => countsAsSale(o) && new Date(o.placed_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).startsWith(thisMonth))
     .reduce((a, o) => a + Number(o.total ?? 0), 0);
+  // Rupee figures on the home screen need the "Sales totals and profit" permission.
+  const showMoney = can("see_sales_total");
+  const monthOrders = (orders ?? []).filter((o) => countsAsSale(o) && new Date(o.placed_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).startsWith(thisMonth)).length;
   const openIssues = (issues ?? []).filter((i) => i.status !== "resolved").length;
   const d = (v: string | number, ready: unknown) => (ready ? v : "…");
 
   const tiles = [
     ...(!can("sales_all") ? [] : [{ href: "/orders", title: "Sales", big: d(s.notDispatched, orders), note: "orders not dispatched", sub: `${d(s.expressDue, orders)} express due · ${d(openIssues, issues)} open disputes` }]),
-    ...(admin ? [{ href: "/expenses", title: "Purchase", big: d(money(s.spent), orders && expenses), note: "spent so far", sub: "Fabric, stitching, transport and more" }] : []),
+    ...(admin ? [{ href: "/expenses", title: "Purchase", big: showMoney ? d(money(s.spent), orders && expenses) : d((expenses ?? []).length, expenses), note: showMoney ? "spent so far" : "entries recorded", sub: "Fabric, stitching, transport and more" }] : []),
     ...(!can("inventory") ? [] : [{ href: "/inventory", title: "Inventory", big: d(short, products && orders), note: "designs short on fabric", sub: `${d((products ?? []).reduce((a, p) => a + p.in_stock, 0), products)} fabric sets in stock` }]),
-    ...(can("reports") ? [{ href: "/reports", title: "Reports", big: d(money(monthSales), orders), note: "sales this month", sub: `${d(money(s.sales), orders)} all time` }] : []),
+    ...(can("reports") ? [{ href: "/reports", title: "Reports", big: showMoney ? d(money(monthSales), orders) : d(monthOrders, orders), note: showMoney ? "sales this month" : "orders this month", sub: showMoney ? `${d(money(s.sales), orders)} all time` : "Month by month" }] : []),
     ...(!can("masters") ? [] : [{ href: "/masters", title: "Masters", big: d((products ?? []).filter((p) => p.active).length, products), note: "designs", sub: "Designs, expense categories, vendors" }]),
   ];
 

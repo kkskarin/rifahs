@@ -25,7 +25,7 @@ export const PERM_GROUPS = [
     hint: "What money figures this role sees.",
     perms: [
       { key: "see_amounts", label: "Order amounts and prices" },
-      { key: "see_sales_total", label: "Sales totals (the Sales figure and home tiles)" },
+      { key: "see_sales_total", label: "Sales totals and profit (Sales figure, home tiles, Reports)" },
     ],
   },
   {

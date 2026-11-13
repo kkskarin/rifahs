@@ -13,6 +13,9 @@ export default function ReportsPage() {
   const { data: me } = useMe();
   const { can } = useCan();
   const admin = can("reports");
+  // Sales and profit need "Sales totals and profit"; spending needs the Purchase tab.
+  const showSales = can("see_sales_total");
+  const showSpend = can("purchase");
   const { data: orders } = useOrders();
   const { data: expenses } = useExpenses(can("purchase"));
   const { data: cats } = useExpenseCategories();
@@ -43,18 +46,18 @@ export default function ReportsPage() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [expenses, cats]);
 
-  if (me && !admin) return <p className="empty">Reports are visible to owners and admins.</p>;
+  if (me && !admin) return <p className="empty">Your role doesn't include Reports.</p>;
   return (
     <>
       <div className="page-head">
         <h1>Reports</h1>
-        <p>Sales, spending and approximate profit, month by month.</p>
+        <p>{showSales ? "Sales, spending and approximate profit, month by month." : "Orders month by month. Your role doesn't include sales totals."}</p>
       </div>
 
 
       <div className="panel">
         <h3>Month by month</h3>
-        {!orders || !expenses ? (
+        {!orders || (showSpend && !expenses) ? (
           <p className="hint">Loading…</p>
         ) : (
           <div className="scroll-x">
@@ -63,9 +66,9 @@ export default function ReportsPage() {
                 <tr>
                   <th>Month</th>
                   <th className="n">Orders</th>
-                  <th className="n">Sales</th>
-                  <th className="n">Spent</th>
-                  <th className="n">Approx. profit</th>
+                  {showSales && <th className="n">Sales</th>}
+                  {showSpend && <th className="n">Spent</th>}
+                  {showSales && showSpend && <th className="n">Approx. profit</th>}
                 </tr>
               </thead>
               <tbody>
@@ -75,11 +78,13 @@ export default function ReportsPage() {
                     <tr key={k}>
                       <td style={{ whiteSpace: "nowrap" }}>{new Date(k + "-01T00:00:00").toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</td>
                       <td className="n">{r.orders}</td>
-                      <td className="n">{money(r.sales)}</td>
-                      <td className="n">{money(r.spent)}</td>
-                      <td className="n" style={{ color: profit < 0 ? "var(--danger)" : undefined }}>
-                        {money(profit)}
-                      </td>
+                      {showSales && <td className="n">{money(r.sales)}</td>}
+                      {showSpend && <td className="n">{money(r.spent)}</td>}
+                      {showSales && showSpend && (
+                        <td className="n" style={{ color: profit < 0 ? "var(--danger)" : undefined }}>
+                          {money(profit)}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -90,6 +95,7 @@ export default function ReportsPage() {
         <p className="hint">Sales count customer orders that weren&apos;t cancelled or refunded, by order date. Internal / test orders never count.</p>
       </div>
 
+      {showSpend && (
       <div className="panel">
         <h3>Spending by category</h3>
         {byCategoryAll.length ? (
@@ -109,11 +115,12 @@ export default function ReportsPage() {
         <p className="hint">
           Add expenses and filter them by period, category and vendor in{" "}
           <Link className="link" href="/expenses">
-            Expenses
+            Purchase
           </Link>
           .
         </p>
       </div>
+      )}
     </>
   );
 }

@@ -57,7 +57,7 @@ const readViewAs = (): Profile | null => {
 /** Owners can look at the app as another team member. Kept for this browser tab only. */
 export function setViewAs(target: Profile | null) {
   try {
-    if (target) sessionStorage.setItem("view-as", JSON.stringify({ id: target.id, full_name: target.full_name, email: target.email, role: target.role, avatar_url: target.avatar_url ?? null }));
+    if (target) sessionStorage.setItem("view-as", JSON.stringify({ id: target.id, full_name: target.full_name, email: target.email, role: target.role, role_key: target.role_key ?? null, avatar_url: target.avatar_url ?? null }));
     else sessionStorage.removeItem("view-as");
   } catch {}
   mutate("view-as");
