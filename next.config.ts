@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/money", destination: "/reports", permanent: false },
+      { source: "/purchase", destination: "/expenses", permanent: false },
       { source: "/issues", destination: "/disputes", permanent: false },
       { source: "/orders/:id((?!new$)[0-9a-f-]{36})", destination: "/order?id=:id", permanent: false },
     ];

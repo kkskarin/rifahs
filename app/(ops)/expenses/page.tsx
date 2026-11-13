@@ -98,15 +98,15 @@ export default function ExpensesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, vendors]);
 
-  if (me && !admin) return <p className="empty">Expenses are visible to owners and admins.</p>;
+  if (me && !admin) return <p className="empty">Purchase is visible to owners and admins.</p>;
   const bar = (v: number) => ({ width: `${total ? Math.max((v / total) * 100, 1.5) : 0}%` });
   const pct = (v: number) => (total ? `${Math.round((v / total) * 100)}%` : "");
 
   return (
     <>
       <div className="page-head">
-        <h1>Expenses</h1>
-        <p>Record what was spent, on what and to whom — then see where the money went.</p>
+        <h1>Purchase</h1>
+        <p>Record what was bought or spent, on what and from whom — then see where the money went.</p>
       </div>
 
       {me && <ExpenseForm me={me} />}

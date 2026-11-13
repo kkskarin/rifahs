@@ -19,11 +19,11 @@ export default function SalesNav() {
   const all = (orders ?? []).filter((o) => !o.is_internal).length;
   const dash = (v: string | number) => (orders ? v : "…");
 
-  const tabs = [
-    { href: "/orders", label: "Orders", n: all },
-    { href: "/express", label: "Express", n: s.expressDue, hot: s.expressDue > 0 },
-    { href: "/international", label: "International", n: s.international },
-    { href: "/stitching", label: "Stitching queue" },
+  const SALES_PATHS = ["/orders", "/order", "/orders/new", "/express", "/international", "/stitching"];
+  const tabs: { href: string; label: string; n?: number; hot?: boolean; on: boolean }[] = [
+    { href: "/orders", label: "All Sales", n: all, on: SALES_PATHS.includes(path) },
+    { href: "/status", label: "Order Status", on: path === "/status" },
+    { href: "/disputes", label: "Disputes", n: openIssues, hot: openIssues > 0, on: path === "/disputes" },
   ];
 
   return (
@@ -51,15 +51,20 @@ export default function SalesNav() {
       <div className="subnav-row">
         <nav className="tabs" aria-label="Sales">
           {tabs.map((t) => (
-            <Link key={t.href} href={t.href} className="tab" aria-current={path === t.href || (t.href === "/orders" && path === "/order") ? "page" : undefined}>
+            <Link key={t.href} href={t.href} className="tab" aria-current={t.on ? "page" : undefined}>
               {t.label}
               {t.n ? <span className={`n${t.hot ? " hot" : ""}`}>{t.n}</span> : null}
             </Link>
           ))}
         </nav>
-        <Link href="/orders/new" className="btn primary small">
-          + Add entry
-        </Link>
+        <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link href="/stitching" className="btn ghost small" aria-current={path === "/stitching" ? "page" : undefined}>
+            Stitching queue
+          </Link>
+          <Link href="/orders/new" className="btn primary small">
+            + Add entry
+          </Link>
+        </span>
       </div>
     </>
   );

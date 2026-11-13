@@ -13,14 +13,13 @@ export const APP_NAME = "Kaleidoscope · Core";
 
 type Header = { label: string; href: string; match: string[]; adminOnly?: boolean };
 export const HEADERS: Header[] = [
-  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order"] },
-  { label: "Order Status", href: "/status", match: ["/status"] },
-  { label: "Purchase", href: "/purchase", match: ["/purchase"] },
+  // Sales holds All Sales, Order Status and Disputes as sub-tabs (components/SalesNav.tsx).
+  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order", "/status", "/disputes"] },
+  // "Purchase" is the expenses book (what was spent, on what, to whom).
+  { label: "Purchase", href: "/expenses", match: ["/expenses"], adminOnly: true },
   { label: "Inventory", href: "/inventory", match: ["/inventory"] },
-  { label: "Expenses", href: "/expenses", match: ["/expenses"], adminOnly: true },
-  { label: "Disputes", href: "/disputes", match: ["/disputes"] },
-  { label: "Masters", href: "/masters", match: ["/masters"] },
   { label: "Reports", href: "/reports", match: ["/reports"], adminOnly: true },
+  { label: "Masters", href: "/masters", match: ["/masters"] },
 ];
 
 

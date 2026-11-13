@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SalesNav from "@/components/SalesNav";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { dateTime, itemsLine } from "@/lib/format";
@@ -36,10 +37,8 @@ export default function DisputesPage() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>Disputes</h1>
-        <p>Courier problems and customer complaints, from the moment they&apos;re raised until they&apos;re closed.</p>
-      </div>
+      <SalesNav />
+      <p className="hint" style={{ marginTop: 0 }}>Courier problems and customer complaints, from the moment they&apos;re raised until they&apos;re closed.</p>
       <div className="subnav-row">
         <nav className="tabs" aria-label="Disputes">
           {(["shipping", "customer"] as Cat[]).map((c) => (

@@ -17,6 +17,11 @@ export default function ExpressPage() {
   return (
     <>
       <SalesNav />
+      <p style={{ margin: "0 0 10px" }}>
+        <a className="link" href="/orders">
+          ← All Sales
+        </a>
+      </p>
       <p className="hint" style={{ marginTop: 0 }}>
         Express orders still to ship, soonest promise first. Set the promise date on each order so nothing slips.
       </p>

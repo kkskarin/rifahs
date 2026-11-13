@@ -699,3 +699,13 @@ table.entry-table td.n input { text-align: right; }
 @media (pointer: coarse) {
   input, select, textarea { font-size: 16px !important; }
 }
+
+/* Order Status is read-only: the status is a coloured label, not a dropdown. */
+span.status-select { display: inline-block; white-space: nowrap; }
+
+/* Phones: the Sales sub-tabs get their own full-width line; the buttons sit above them. */
+@media (max-width: 720px) {
+  .subnav-row { flex-wrap: wrap-reverse; gap: 4px 12px; }
+  .subnav-row .tabs { flex: 1 0 100%; min-width: 0; }
+  .subnav-row > span { margin-left: auto; }
+}
