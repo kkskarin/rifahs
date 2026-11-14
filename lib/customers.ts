@@ -35,14 +35,17 @@ const phone10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").s
 const normName = (n: string) => n.toLowerCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
 const alnum = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+// Kept as plain lists: the cache decides whether to redraw by comparing old and new data, and it
+// cannot see inside a Map or Set (two different Maps look "the same" to it).
+type Stored = { links: [string, string][]; dismissed: string[] };
 export function useCustomerDecisions() {
-  return useSWR<{ links: Map<string, string>; dismissed: Set<string> }>(
+  return useSWR<Stored>(
     "customer-decisions",
     async () => {
       const [l, d] = await Promise.all([sb().from("customer_links").select("alias_key, primary_key"), sb().from("customer_dismissals").select("signature")]);
       if (l.error) throw l.error;
       if (d.error) throw d.error;
-      return { links: new Map((l.data ?? []).map((r) => [r.alias_key as string, r.primary_key as string])), dismissed: new Set((d.data ?? []).map((r) => r.signature as string)) };
+      return { links: (l.data ?? []).map((r) => [r.alias_key as string, r.primary_key as string] as [string, string]), dismissed: (d.data ?? []).map((r) => r.signature as string) };
     },
     { revalidateOnFocus: true, dedupingInterval: 5000, keepPreviousData: true },
   );
@@ -124,26 +127,33 @@ export function useCustomers() {
   const { data: dec } = useCustomerDecisions();
   return useMemo(() => {
     if (!orders) return { ready: false, customers: [] as Customer[], groups: [] as MergeGroup[] };
-    const { customers, groups } = buildCustomers(orders, dec?.links ?? new Map(), dec?.dismissed ?? new Set());
+    const { customers, groups } = buildCustomers(orders, new Map(dec?.links ?? []), new Set(dec?.dismissed ?? []));
     return { ready: true, customers, groups };
   }, [orders, dec]);
 }
 
 type R = { ok: boolean; message?: string };
+/** Show a decision on screen at once, then confirm it against the database. */
+const apply = (change: (d: Stored) => Stored) =>
+  mutate<Stored>("customer-decisions", (cur) => change({ links: [...(cur?.links ?? [])], dismissed: [...(cur?.dismissed ?? [])] }), { revalidate: true });
 /** Fold the other records into the one being kept. Only Core's view changes; it can be undone. */
 export async function mergeCustomers(keep: Customer, others: Customer[], userId: string): Promise<R> {
   const rows = others.flatMap((c) => c.keys).filter((k) => k !== keep.key).map((alias_key) => ({ alias_key, primary_key: keep.key, created_by: userId }));
   const { error } = await sb().from("customer_links").upsert(rows);
-  mutate("customer-decisions");
-  return error ? { ok: false, message: error.message } : { ok: true, message: `Merged into ${keep.name}.` };
+  if (error) return { ok: false, message: error.message };
+  const aliases = new Set(rows.map((r) => r.alias_key));
+  await apply((d) => ({ ...d, links: [...d.links.filter(([a]) => !aliases.has(a)), ...rows.map((r) => [r.alias_key, r.primary_key] as [string, string])] }));
+  return { ok: true, message: `Merged ${others.length + 1} records into ${keep.name}.` };
 }
 export async function dismissGroup(signature: string, userId: string): Promise<R> {
   const { error } = await sb().from("customer_dismissals").upsert({ signature, created_by: userId });
-  mutate("customer-decisions");
-  return error ? { ok: false, message: error.message } : { ok: true };
+  if (error) return { ok: false, message: error.message };
+  await apply((d) => ({ ...d, dismissed: [...d.dismissed, signature] }));
+  return { ok: true, message: "Marked as different people." };
 }
 export async function unmergeCustomer(c: Customer): Promise<R> {
   const { error } = await sb().from("customer_links").delete().eq("primary_key", c.key);
-  mutate("customer-decisions");
-  return error ? { ok: false, message: error.message } : { ok: true, message: "Separated again." };
+  if (error) return { ok: false, message: error.message };
+  await apply((d) => ({ ...d, links: d.links.filter(([, primary]) => primary !== c.key) }));
+  return { ok: true, message: `${c.name} is separated again.` };
 }

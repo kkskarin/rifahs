@@ -153,6 +153,7 @@ function AllView({ customers }: { customers: Customer[] }) {
 function MergeView({ groups }: { groups: MergeGroup[] }) {
   const { can } = useCan();
   const canEdit = can("edit_orders");
+  const [done, setDone] = useState<string | null>(null);
   const involved = groups.reduce((a, g) => a + g.members.length, 0);
   return (
     <>
@@ -161,6 +162,7 @@ function MergeView({ groups }: { groups: MergeGroup[] }) {
         <b>name</b>. Choose which record to keep and merge, or say they are different people. Merging here changes how Core lists them; it can be
         undone from All Customers, and it does not change Shopify&apos;s customer records.
       </p>
+      {done && <p className="success">{done}{done.startsWith("Merged") ? " You can undo it from All Customers." : ""}</p>}
       {!groups.length ? (
         <p className="empty">No customers to merge.</p>
       ) : (
@@ -177,7 +179,7 @@ function MergeView({ groups }: { groups: MergeGroup[] }) {
               {REASON_LABEL[reason]} <span className="meta">· {list.length}</span>
             </h3>
             {list.map((g) => (
-              <GroupCard key={g.signature} g={g} canEdit={canEdit} />
+              <GroupCard key={g.signature} g={g} canEdit={canEdit} onDone={setDone} />
             ))}
           </section>
         );
@@ -186,7 +188,7 @@ function MergeView({ groups }: { groups: MergeGroup[] }) {
   );
 }
 
-function GroupCard({ g, canEdit }: { g: MergeGroup; canEdit: boolean }) {
+function GroupCard({ g, canEdit, onDone }: { g: MergeGroup; canEdit: boolean; onDone: (m: string) => void }) {
   const { data: me } = useMe();
   const [keep, setKeep] = useState(g.members[0].key);
   const [busy, setBusy] = useState(false);
@@ -196,6 +198,7 @@ function GroupCard({ g, canEdit }: { g: MergeGroup; canEdit: boolean }) {
     const r = await fn();
     setBusy(false);
     setErr(r.ok ? null : (r.message ?? "Couldn't save"));
+    if (r.ok && r.message) onDone(r.message);
   };
   return (
     <div className="panel merge-card">
@@ -224,7 +227,7 @@ function GroupCard({ g, canEdit }: { g: MergeGroup; canEdit: boolean }) {
             disabled={busy}
             onClick={() => run(() => mergeCustomers(g.members.find((c) => c.key === keep)!, g.members.filter((c) => c.key !== keep), me.id))}
           >
-            Merge {g.members.length} into one
+            {busy ? "Merging…" : `Merge ${g.members.length} into one`}
           </button>
         </div>
       )}
