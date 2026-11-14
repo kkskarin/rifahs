@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { mutate } from "swr";
 import { lookupPin, pushOrderToShopify } from "@/app/(ops)/actions";
 import { COUNTRIES, IN_STATE_NAMES, matchState } from "@/lib/places";
+import PhoneInput from "@/components/PhoneInput";
+import { useCustomers, useProfiles, type Customer, type Profile } from "@/lib/customers";
 import { entryTotals, taxTypeFor, type EntryLine } from "@/lib/entry";
 import { money } from "@/lib/format";
 import { normDesign, useProducts, useShopifyStock } from "@/lib/inventory";
@@ -39,6 +41,57 @@ export default function EntryForm({ order }: { order?: Order }) {
   const [district, setDistrict] = useState(addr?.district ?? "");
   const [pin, setPin] = useState(addr?.zip ?? "");
   const [pinNote, setPinNote] = useState("");
+  const [custName, setCustName] = useState(order?.customer_name ?? "");
+  const [phone, setPhone] = useState(order?.customer_phone ?? "");
+  const [email, setEmail] = useState(order?.customer_email ?? "");
+  const [address1, setAddress1] = useState(addr?.address1 ?? "");
+  // Find an existing customer by name, phone or address and fill everything in.
+  const { customers } = useCustomers();
+  const { data: profiles } = useProfiles();
+  const [find, setFind] = useState("");
+  const [picked, setPicked] = useState("");
+  const matches = useMemo(() => {
+    const n = find.trim().toLowerCase();
+    if (n.length < 2) return [];
+    const digits = n.replace(/\D/g, "");
+    const by = new Map((profiles ?? []).map((p) => [p.key, p]));
+    return customers
+      .map((c) => ({ c, p: by.get(c.key) }))
+      .filter(({ c, p }) => {
+        const hay = [c.name, ...c.names, p?.name, c.email, c.raw.address1, c.raw.address2, c.raw.city, c.raw.zip, p?.address1, p?.address2, p?.city].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(n) || (digits.length >= 4 && [c.phone, ...c.phones].some((x) => x.replace(/\D/g, "").includes(digits)));
+      })
+      .sort((a, b) => b.c.last.localeCompare(a.c.last))
+      .slice(0, 6);
+  }, [find, customers, profiles]);
+  const fill = (c: Customer, p?: Profile) => {
+    setCustName(p?.name || c.name);
+    setPhone(p?.phone || c.phone);
+    setEmail(p?.email || c.email);
+    setAddress1(p ? [p.address1, p.address2].filter(Boolean).join(", ") : [c.raw.address1, c.raw.address2].filter(Boolean).join(", "));
+    setCity(p?.city || c.raw.city || c.city);
+    setDistrict(p?.district ?? "");
+    const ctry = p?.country || c.raw.country || "India";
+    setOtherCountry(!COUNTRIES.includes(ctry));
+    setCountry(ctry);
+    setState(/^india$/i.test(ctry) ? matchState(p?.state || c.raw.province) : p?.state || c.raw.province);
+    const zip = (p?.pin || c.raw.zip || "").replace(/\s/g, "");
+    setPin(zip);
+    setPinNote("");
+    // An older record with a PIN but no state: fill state and district from the PIN.
+    if (/^india$/i.test(ctry) && /^[1-9]\d{5}$/.test(zip) && !(p?.state || c.raw.province)) {
+      const keepCity = p?.city || c.raw.city || c.city;
+      void (async () => {
+        const r = (await safe(() => lookupPin(zip))) as Awaited<ReturnType<typeof lookupPin>>;
+        if (!r.ok) return;
+        setState(matchState(r.state ?? ""));
+        setDistrict(r.district ?? "");
+        if (!keepCity) setCity(r.city ?? "");
+      })();
+    }
+    setPicked(p?.name || c.name);
+    setFind("");
+  };
   const india = /^(india|in)?$/i.test(country.trim());
   // Typing a PIN fills in city, district and state. They stay editable.
   const onPin = async (raw: string) => {
@@ -161,22 +214,43 @@ export default function EntryForm({ order }: { order?: Order }) {
       <h2>{order ? "Order details" : "New order"}</h2>
 
       <h3>Customer</h3>
+      {!order && (
+        <div className="cust-find">
+          <label className="field">
+            <span>Existing customer?</span>
+            <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type a name, phone number or address to find them" autoComplete="off" />
+          </label>
+          {matches.length > 0 && (
+            <ul>
+              {matches.map(({ c, p }) => (
+                <li key={c.key}>
+                  <button type="button" onClick={() => fill(c, p)}>
+                    <b>{p?.name || c.name}</b> <span className="meta">{[p?.phone || c.phone, p?.city || c.city, `${c.orders} order${c.orders === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {find.trim().length >= 2 && !matches.length && <small className="hint">No existing customer matches. Fill in the details below.</small>}
+          {picked && !find && <small className="hint">Filled in from {picked}. Change anything that is different for this order.</small>}
+        </div>
+      )}
       <div className="grid">
         <label className="field">
           <span>Name</span>
-          <input name="customer_name" required defaultValue={order?.customer_name} />
+          <input name="customer_name" required value={custName} onChange={(e) => setCustName(e.target.value)} />
         </label>
         <label className="field">
           <span>Phone</span>
-          <input name="customer_phone" type="tel" defaultValue={order?.customer_phone ?? ""} />
+          <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact />
         </label>
         <label className="field">
           <span>Email</span>
-          <input name="customer_email" type="email" defaultValue={order?.customer_email ?? ""} />
+          <input name="customer_email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="field full">
           <span>Address</span>
-          <input name="address1" defaultValue={addr?.address1 ?? ""} placeholder="House, street, area" />
+          <input name="address1" value={address1} onChange={(e) => setAddress1(e.target.value)} placeholder="House, street, area" />
         </label>
         <label className="field">
           <span>Country</span>

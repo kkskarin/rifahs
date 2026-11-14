@@ -765,3 +765,14 @@ th[aria-sort] .th-sort { color: var(--accent); }
 /* Clean Up: Claude's questions */
 .doubts { margin: 10px 0; padding: 10px 14px 10px 30px; background: var(--st-new-bg, #fdf0cf); border-radius: 6px; }
 .doubts li { margin: 3px 0; }
+
+/* Phone: country code + number */
+.phone-input { display: flex; gap: 6px; min-width: 0; }
+.phone-input select { flex: 0 0 auto; width: 96px; padding-left: 8px; padding-right: 4px; }
+.phone-input input[type="tel"] { flex: 1; min-width: 0; }
+/* Add entry: find an existing customer */
+.cust-find { position: relative; margin-bottom: 14px; }
+.cust-find ul { list-style: none; margin: 6px 0 0; padding: 0; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--field); }
+.cust-find li + li { border-top: 1px solid var(--line); }
+.cust-find li button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; font: inherit; color: inherit; cursor: pointer; }
+.cust-find li button:hover, .cust-find li button:focus-visible { background: rgb(var(--ink-rgb) / 0.05); }

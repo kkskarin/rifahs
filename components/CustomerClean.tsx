@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PhoneInput from "@/components/PhoneInput";
 import { useRef, useState } from "react";
 import { mutate } from "swr";
 import { cleanCustomersStep, type CleanStep } from "@/app/(ops)/actions";
@@ -39,7 +40,11 @@ export function ProfileForm({ c, profile, onSaved }: { c: Customer; profile?: Pr
         {PROFILE_FIELDS.map((f) => (
           <label key={f} className={`field${wide.includes(f) ? " full" : ""}`}>
             <span>{FIELD_LABEL[f]}</span>
-            <input value={v[f]} disabled={!canEdit} onChange={(e) => setV((x) => ({ ...x, [f]: e.target.value }))} inputMode={f === "pin" ? "numeric" : f === "phone" ? "tel" : f === "email" ? "email" : undefined} />
+            {f === "phone" ? (
+              <PhoneInput value={v.phone} disabled={!canEdit} onChange={(p) => setV((x) => ({ ...x, phone: p }))} />
+            ) : (
+            <input value={v[f]} disabled={!canEdit} onChange={(e) => setV((x) => ({ ...x, [f]: e.target.value }))} inputMode={f === "pin" ? "numeric" : f === "email" ? "email" : undefined} />
+            )}
           </label>
         ))}
       </div>

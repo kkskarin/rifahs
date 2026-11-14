@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PhoneInput from "@/components/PhoneInput";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { mutate } from "swr";
@@ -14,6 +15,7 @@ export default function OrderForm({ order }: { order?: Order }) {
   const router = useRouter();
   const { data: me } = useMe();
   const [busy, setBusy] = useState(false);
+  const [phone, setPhone] = useState(order?.customer_phone ?? "");
   const [state, setState] = useState<{ ok: boolean; message?: string; id?: string } | null>(null);
   const fromShopify = Boolean(order?.shopify_id);
   const sizes = new Set(order?.items.map((i) => i.size).filter(Boolean));
@@ -91,7 +93,7 @@ export default function OrderForm({ order }: { order?: Order }) {
         </label>
         <label className="field">
           <span>Phone</span>
-          <input name="customer_phone" type="tel" defaultValue={order?.customer_phone ?? ""} />
+          <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact />
         </label>
         <label className="field">
           <span>Email</span>
