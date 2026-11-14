@@ -70,7 +70,8 @@ function mapItems(o: ShopifyOrder): OrderItem[] {
 }
 
 function isExpress(o: ShopifyOrder) {
-  const hay = [o.shippingLine?.title ?? "", ...o.tags, ...o.lineItems.nodes.map((l) => l.title)].join(" ");
+  // The team mostly marks express in the order note ("EXPRESS DELIVERY", "PRIORITY ORDER"), so read that too.
+  const hay = [o.shippingLine?.title ?? "", ...o.tags, ...o.lineItems.nodes.map((l) => l.title), o.note ?? ""].join(" ");
   return /express|priority|urgent/i.test(hay);
 }
 
