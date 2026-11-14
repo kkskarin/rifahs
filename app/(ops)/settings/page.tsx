@@ -3,7 +3,7 @@
 import { useState } from "react";
 import SettingsTabs from "@/components/SettingsTabs";
 import { mutate } from "swr";
-import { allocateStep, checkDeliveriesStep, removeCoreTestOrder, syncShopifyNow, type DeliveryStep } from "../actions";
+import { allocateStep, checkDeliveriesStep, removeCoreTestOrder, restartOrderSync, syncShopifyNow, type DeliveryStep } from "../actions";
 import { dateTime } from "@/lib/format";
 import { isAdmin } from "@/lib/roles";
 import { safe } from "@/lib/safe";
@@ -106,6 +106,45 @@ export default function SettingsPage() {
           }}
         >
           {busy ? "Syncing…" : "Sync orders now"}
+        </button>
+        <button
+          className="btn ghost"
+          disabled={busy}
+          title="Reads every order again from the first one, in batches"
+          onClick={async () => {
+            if (!confirm("Re-read every order from Shopify, from the first order onwards? Statuses, notes and size changes made in Core are kept. This takes a few minutes; keep this page open.")) return;
+            setBusy(true);
+            const start = (await safe(restartOrderSync)) as { ok: boolean; message?: string };
+            if (!start.ok) {
+              setBusy(false);
+              return setMsg(start);
+            }
+            let created = 0;
+            let updated = 0;
+            let last: { ok: boolean; message?: string; more?: boolean } = { ok: true };
+            // One short batch at a time, because the hosting cuts off anything that runs long.
+            for (let i = 0; i < 120; i++) {
+              last = (await safe(syncShopifyNow)) as { ok: boolean; message?: string; more?: boolean };
+              const m = /(\d+) new, (\d+) updated/.exec(last.message ?? "");
+              if (m) {
+                created += Number(m[1]);
+                updated += Number(m[2]);
+              }
+              setMsg({ ok: true, message: `Re-reading all orders… ${created + updated} read so far` });
+              mutate("sync");
+              if (!last.ok || !last.more) break;
+            }
+            setBusy(false);
+            setMsg(
+              last.ok && !last.more
+                ? { ok: true, message: `All orders re-read from Shopify: ${updated} updated, ${created} new. Press “Sync orders now” once to refresh delivery status.` }
+                : { ok: false, message: `Stopped after ${created + updated} orders: ${last.message ?? "try again"} Press the button again to carry on from there.` },
+            );
+            mutate("orders");
+            mutate("sync");
+          }}
+        >
+          Re-read all orders
         </button>
       </div>
       {msg && <p className={msg.ok ? "success" : "error"}>{msg.message}</p>}

@@ -10,7 +10,7 @@ import { syncBudgetMs, syncDeliveries, syncRecent, syncStock } from "@/lib/sync"
 import { siteUrl } from "@/lib/site";
 import type { OrderItem, TeamRole } from "@/lib/types";
 
-export type ActionResult = { ok: boolean; message?: string };
+export type ActionResult = { ok: boolean; message?: string; more?: boolean };
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
@@ -74,6 +74,7 @@ export async function syncShopifyNow(): Promise<ActionResult> {
     const stock = await syncStock();
     return {
       ok: true,
+      more: !r.done,
       message:
         `Orders: ${r.created} new, ${r.updated} updated${r.done ? "" : " — more to fetch, press again"}. ` +
         (stock.ok ? `Stock: ${stock.variants} sizes read from Shopify.` : `Stock not read: ${stock.message}`),
@@ -274,4 +275,20 @@ export async function allocateStep(): Promise<ActionResult> {
   await requireAdmin();
   const { data, error } = await supabaseAdmin().rpc("allocate_on_hand");
   return error ? { ok: false, message: error.message } : { ok: true, message: String(data ?? 0) };
+}
+
+/**
+ * Start the order sync again from the very first order, so every existing order is re-read from
+ * Shopify (customer details, items, amounts, delivery). The team's statuses, notes and sizes are kept.
+ */
+export async function restartOrderSync(): Promise<ActionResult> {
+  await requireAdmin();
+  if (!shopifyConfigured()) return { ok: false, message: "Shopify credentials aren't set yet" };
+  const db = supabaseAdmin();
+  // If a full re-read is already under way (it stopped part-way), carry on from where it stopped.
+  const { data: state } = await db.from("sync_state").select("value").eq("key", "shopify_orders").maybeSingle();
+  const v = (state?.value ?? {}) as { since?: string; cursor?: string | null };
+  if (v.cursor && !v.since) return { ok: true };
+  const { error } = await db.from("sync_state").upsert({ key: "shopify_orders", value: {}, updated_at: new Date().toISOString() });
+  return error ? { ok: false, message: error.message } : { ok: true };
 }
