@@ -753,3 +753,11 @@ span.status-select { display: inline-block; white-space: nowrap; }
 .subband a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
 /* The buttons that used to sit beside the old tab row */
 .subnav-row.actions-only { border-bottom: 0; justify-content: flex-end; margin-bottom: 14px; }
+
+/* Sortable column headings */
+.th-sort { background: none; border: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.th-sort:hover { color: var(--text); }
+th[aria-sort] .th-sort { color: var(--accent); }
+.merge-card { padding-top: 10px; padding-bottom: 12px; margin-bottom: 12px; }
+.merge-card .master-row input[type="radio"] { accent-color: var(--wine); width: 16px; height: 16px; flex: none; }
+.subband .n { font-size: 12px; font-weight: 600; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; }

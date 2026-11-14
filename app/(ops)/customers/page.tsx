@@ -1,99 +1,82 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { REASON_LABEL, dismissGroup, mergeCustomers, unmergeCustomer, useCustomers, type Customer, type MergeGroup } from "@/lib/customers";
 import { money, shortDate } from "@/lib/format";
 import { useCan } from "@/lib/perms";
-import { useOrders } from "@/lib/store";
+import { useMe } from "@/lib/store";
 
-type Customer = { key: string; name: string; phone: string; email: string; city: string; orders: number; total: number; last: string; names: Set<string> };
-type Sort = "recent" | "orders" | "total" | "name";
+type Col = "name" | "phone" | "email" | "city" | "orders" | "total" | "last";
+const COLS: { key: Col; label: string; num?: boolean }[] = [
+  { key: "name", label: "Customer" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "city", label: "City" },
+  { key: "orders", label: "Orders", num: true },
+  { key: "total", label: "Spent", num: true },
+  { key: "last", label: "Last order" },
+];
 
-const digits = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").slice(-10);
-
-/** Everyone who has ordered, worked out from the orders in Core: one row per phone number (or email). */
 export default function CustomersPage() {
   const { can } = useCan();
-  const { data: orders } = useOrders();
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState<Sort>("recent");
-  const [limit, setLimit] = useState(100);
-  const showMoney = can("see_amounts");
+  const view = useSearchParams().get("v") === "merge" ? "merge" : "all";
+  const data = useCustomers();
+  if (!can("see_contact")) return <p className="empty">Your role doesn&apos;t include customer details. Ask the owner if you need it.</p>;
+  if (!data.ready) return <p className="empty">Loading…</p>;
+  return view === "merge" ? <MergeView groups={data.groups} /> : <AllView customers={data.customers} />;
+}
 
-  const list = useMemo(() => {
-    const m = new Map<string, Customer>();
-    for (const o of orders ?? []) {
-      if (o.is_internal) continue;
-      const phone = digits(o.customer_phone);
-      const email = (o.customer_email ?? "").trim().toLowerCase();
-      const key = phone ? `p:${phone}` : email ? `e:${email}` : `n:${o.customer_name.trim().toLowerCase()}`;
-      const c = m.get(key) ?? { key, name: o.customer_name, phone: o.customer_phone ?? "", email, city: o.ship_city ?? "", orders: 0, total: 0, last: "", names: new Set<string>() };
-      c.orders += 1;
-      if (o.status !== "cancelled" && o.status !== "refunded") c.total += Number(o.total ?? 0);
-      c.names.add(o.customer_name.trim());
-      if (o.placed_at > c.last) {
-        // The newest order has the most up-to-date details.
-        c.last = o.placed_at;
-        c.name = o.customer_name;
-        c.phone = o.customer_phone ?? c.phone;
-        c.email = email || c.email;
-        c.city = o.ship_city ?? c.city;
-      }
-      m.set(key, c);
-    }
-    return [...m.values()];
-  }, [orders]);
+function AllView({ customers }: { customers: Customer[] }) {
+  const { can } = useCan();
+  const showMoney = can("see_amounts");
+  const canEdit = can("edit_orders");
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState<{ col: Col; dir: 1 | -1 }>({ col: "last", dir: -1 });
+  const [limit, setLimit] = useState(100);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase();
-    const rows = n ? list.filter((c) => [c.name, ...c.names, c.phone, c.email, c.city].join(" ").toLowerCase().includes(n)) : list;
-    const by: Record<Sort, (a: Customer, b: Customer) => number> = {
-      recent: (a, b) => b.last.localeCompare(a.last),
-      orders: (a, b) => b.orders - a.orders || b.last.localeCompare(a.last),
-      total: (a, b) => b.total - a.total,
-      name: (a, b) => a.name.localeCompare(b.name),
-    };
-    return [...rows].sort(by[sort]);
-  }, [list, q, sort]);
-
-  if (!can("see_contact")) return <p className="empty">Your role doesn&apos;t include customer details. Ask the owner if you need it.</p>;
-  const repeat = list.filter((c) => c.orders > 1).length;
+    const rows = n ? customers.filter((c) => [c.name, ...c.names, c.phone, ...c.phones, c.email, c.city].join(" ").toLowerCase().includes(n)) : customers;
+    const val = (c: Customer): string | number => (sort.col === "orders" ? c.orders : sort.col === "total" ? c.total : (c[sort.col] ?? "").toString().toLowerCase());
+    return [...rows].sort((a, b) => {
+      const x = val(a);
+      const y = val(b);
+      // Blanks always go last, whichever way the column is sorted.
+      if (x === "" && y !== "") return 1;
+      if (y === "" && x !== "") return -1;
+      return (x < y ? -1 : x > y ? 1 : 0) * sort.dir || b.last.localeCompare(a.last);
+    });
+  }, [customers, q, sort]);
+  const cols = COLS.filter((c) => c.key !== "total" || showMoney);
+  const repeat = customers.filter((c) => c.orders > 1).length;
+  // First click on a column: A–Z for text, highest first for numbers and dates.
+  const click = (col: Col) => setSort((s) => (s.col === col ? { col, dir: s.dir === 1 ? -1 : 1 } : { col, dir: col === "orders" || col === "total" || col === "last" ? -1 : 1 }));
 
   return (
     <>
       <section className="stats" aria-label="Summary">
         <div className="stat">
           <div className="label">Customers</div>
-          <div className="value">{orders ? list.length : "…"}</div>
+          <div className="value">{customers.length}</div>
         </div>
         <div className="stat">
           <div className="label">Ordered more than once</div>
-          <div className="value accent">{orders ? repeat : "…"}</div>
+          <div className="value accent">{repeat}</div>
         </div>
       </section>
-      <p className="hint">
-        Built from the orders in Core: one row per phone number, or per email when there is no phone. Editing a customer and merging duplicates
-        will come here once the Shopify app has the customer permissions.
-      </p>
+      <p className="hint">Worked out from the orders in Core. Cancelled and refunded orders are not counted as orders. Click a column heading to sort by it.</p>
       <div className="toolbar">
         <label className="search">
           <span className="sr-only">Search customers</span>
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone, email, city" />
         </label>
-        <label className="field" style={{ minWidth: 190 }}>
-          <span className="sr-only">Sort</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort">
-            <option value="recent">Most recent order</option>
-            <option value="orders">Most orders</option>
-            {showMoney && <option value="total">Highest spend</option>}
-            <option value="name">Name A–Z</option>
-          </select>
-        </label>
       </div>
+      {msg && <p className="success">{msg}</p>}
 
-      {!orders ? (
-        <p className="empty">Loading…</p>
-      ) : !shown.length ? (
+      {!shown.length ? (
         <p className="empty">No customers match.</p>
       ) : (
         <div className="panel" style={{ padding: 0 }}>
@@ -101,13 +84,14 @@ export default function CustomersPage() {
             <table className="t stack">
               <thead>
                 <tr>
-                  <th>Customer</th>
-                  <th>Phone</th>
-                  <th>Email</th>
-                  <th>City</th>
-                  <th className="n">Orders</th>
-                  {showMoney && <th className="n">Spent</th>}
-                  <th>Last order</th>
+                  {cols.map((c) => (
+                    <th key={c.key} className={c.num ? "n" : undefined} aria-sort={sort.col === c.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}>
+                      <button className="th-sort" onClick={() => click(c.key)}>
+                        {c.label}
+                        <span aria-hidden>{sort.col === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}</span>
+                      </button>
+                    </th>
+                  ))}
                   <th />
                 </tr>
               </thead>
@@ -116,7 +100,20 @@ export default function CustomersPage() {
                   <tr key={c.key}>
                     <td className="stack-title">
                       {c.name}
-                      {c.names.size > 1 && <div className="meta">also: {[...c.names].filter((x) => x !== c.name.trim()).join(", ")}</div>}
+                      {c.names.length > 1 && <div className="meta">also: {c.names.filter((x) => x !== c.name).join(", ")}</div>}
+                      {c.keys.length > 1 && (
+                        <div className="meta">
+                          {c.keys.length} records merged
+                          {canEdit && (
+                            <>
+                              {" · "}
+                              <button className="link" onClick={async () => confirm(`Separate ${c.name} back into ${c.keys.length} customers?`) && setMsg((await unmergeCustomer(c)).message ?? null)}>
+                                Unmerge
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td data-label="Phone">{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : <span className="meta">—</span>}</td>
                     <td data-label="Email">{c.email || <span className="meta">—</span>}</td>
@@ -131,7 +128,7 @@ export default function CustomersPage() {
                     )}
                     <td data-label="Last order">{shortDate(c.last)}</td>
                     <td className="stack-actions">
-                      <Link className="link" href={`/orders?${new URLSearchParams({ f: "all", q: digits(c.phone) || c.email || c.name })}`}>
+                      <Link className="link" href={`/orders?${new URLSearchParams({ f: "all", q: c.phones[0] || c.email || c.name })}`}>
                         Orders
                       </Link>
                     </td>
@@ -150,5 +147,87 @@ export default function CustomersPage() {
         </div>
       )}
     </>
+  );
+}
+
+function MergeView({ groups }: { groups: MergeGroup[] }) {
+  const { can } = useCan();
+  const canEdit = can("edit_orders");
+  const involved = groups.reduce((a, g) => a + g.members.length, 0);
+  return (
+    <>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Customers that look like the same person: first by <b>mobile number</b>, then by <b>similar address</b> (same PIN code and street), then by{" "}
+        <b>name</b>. Choose which record to keep and merge, or say they are different people. Merging here changes how Core lists them; it can be
+        undone from All Customers, and it does not change Shopify&apos;s customer records.
+      </p>
+      {!groups.length ? (
+        <p className="empty">No customers to merge.</p>
+      ) : (
+        <p className="hint">
+          {involved} customers in {groups.length} group{groups.length === 1 ? "" : "s"}.
+        </p>
+      )}
+      {(["mobile", "address", "name"] as const).map((reason) => {
+        const list = groups.filter((g) => g.reason === reason);
+        if (!list.length) return null;
+        return (
+          <section key={reason}>
+            <h3 style={{ margin: "22px 0 10px" }}>
+              {REASON_LABEL[reason]} <span className="meta">· {list.length}</span>
+            </h3>
+            {list.map((g) => (
+              <GroupCard key={g.signature} g={g} canEdit={canEdit} />
+            ))}
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+function GroupCard({ g, canEdit }: { g: MergeGroup; canEdit: boolean }) {
+  const { data: me } = useMe();
+  const [keep, setKeep] = useState(g.members[0].key);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const run = async (fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    setBusy(true);
+    const r = await fn();
+    setBusy(false);
+    setErr(r.ok ? null : (r.message ?? "Couldn't save"));
+  };
+  return (
+    <div className="panel merge-card">
+      <div className="master-list">
+        {g.members.map((c) => (
+          <label key={c.key} className="master-row" style={{ cursor: canEdit ? "pointer" : undefined }}>
+            {canEdit && <input type="radio" name={g.signature} checked={keep === c.key} onChange={() => setKeep(c.key)} aria-label={`Keep ${c.name}`} />}
+            <span className="master-name">
+              {c.name}
+              {keep === c.key && canEdit ? <span className="flag intl" style={{ marginLeft: 8 }}>Keep</span> : null}
+            </span>
+            <span className="meta">
+              {[c.phone, c.email, c.address || c.city].filter(Boolean).join(" · ")} · {c.orders} order{c.orders === 1 ? "" : "s"} · last {shortDate(c.last)}
+            </span>
+          </label>
+        ))}
+      </div>
+      {err && <p className="error">{err}</p>}
+      {canEdit && me && (
+        <div className="form-actions">
+          <button className="link" disabled={busy} onClick={() => run(() => dismissGroup(g.signature, me.id))}>
+            Different people
+          </button>
+          <button
+            className="btn primary small"
+            disabled={busy}
+            onClick={() => run(() => mergeCustomers(g.members.find((c) => c.key === keep)!, g.members.filter((c) => c.key !== keep), me.id))}
+          >
+            Merge {g.members.length} into one
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { mutate } from "swr";
 import { lookupPin, pushOrderToShopify } from "@/app/(ops)/actions";
@@ -19,6 +19,8 @@ const num = (v: string) => Number(v.replace(/[₹,\s]/g, "")) || 0;
 /** Manual order entry: an items table with GST breakup, then delivery and payment details. */
 export default function EntryForm({ order }: { order?: Order }) {
   const router = useRouter();
+  // "+ Add entry" pressed from Express / International / Exchanges / Internal: start with that box ticked.
+  const tick = useSearchParams().get("tick");
   const { data: me } = useMe();
   const { data: products } = useProducts();
   const { data: stock } = useShopifyStock();
@@ -439,16 +441,16 @@ export default function EntryForm({ order }: { order?: Order }) {
         </label>
         <div className="field full" style={{ display: "flex", gap: "8px 22px", flexWrap: "wrap" }}>
           <label className="checkbox">
-            <input type="checkbox" name="is_express" defaultChecked={order?.is_express} /> Express
+            <input type="checkbox" name="is_express" defaultChecked={order ? order.is_express : tick === "express"} /> Express
           </label>
           <label className="checkbox">
-            <input type="checkbox" name="is_international" defaultChecked={order?.is_international} /> International
+            <input type="checkbox" name="is_international" defaultChecked={order ? order.is_international : tick === "international"} /> International
           </label>
           <label className="checkbox">
-            <input type="checkbox" name="is_exchange" defaultChecked={order?.is_exchange} /> Exchange
+            <input type="checkbox" name="is_exchange" defaultChecked={order ? order.is_exchange : tick === "exchange"} /> Exchange
           </label>
           <label className="checkbox" title="Staff / test orders: never counted in sales. If sent to Shopify, the name gets (Test)">
-            <input type="checkbox" name="is_internal" defaultChecked={order?.is_internal} /> Internal / test order
+            <input type="checkbox" name="is_internal" defaultChecked={order ? order.is_internal : tick === "internal"} /> Internal / test order
           </label>
         </div>
       </div>

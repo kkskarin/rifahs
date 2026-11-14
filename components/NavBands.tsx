@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useCustomers } from "@/lib/customers";
 import { useCan, type PermKey } from "@/lib/perms";
 import { isAdmin } from "@/lib/roles";
 import { useIssues, useMe, useOrders } from "@/lib/store";
@@ -13,7 +14,7 @@ import { useIssues, useMe, useOrders } from "@/lib/store";
  *   Sub tabs     — the light row beneath: views inside the main tab you are in
  */
 type Ctx = { path: string; q: (k: string) => string | null };
-type Sub = { label: string; href: string; on: (c: Ctx) => boolean; perm?: PermKey };
+type Sub = { label: string; href: string; on: (c: Ctx) => boolean; perm?: PermKey; n?: number };
 type Main = { label: string; href: string; on: (c: Ctx) => boolean; perms?: PermKey[]; who?: "admin" | "owner"; n?: number; hot?: boolean; subs?: Sub[] };
 
 const is = (...paths: string[]) => (c: Ctx) => paths.includes(c.path);
@@ -30,6 +31,8 @@ export default function NavBands() {
   const owner = me?.role === "owner";
   const openIssues = (issues ?? []).filter((i) => i.status !== "resolved").length;
   const allOrders = (orders ?? []).filter((o) => !o.is_internal).length;
+  // How many customers look like duplicates of someone else (shown on the Merge sub tab).
+  const mergeable = useCustomers().groups.reduce((a, g) => a + g.members.length, 0);
 
   const SALES: Main[] = [
     {
@@ -58,7 +61,16 @@ export default function NavBands() {
         { label: "Customer", href: "/disputes?t=customer", on: (c) => c.q("t") === "customer" },
       ],
     },
-    { label: "Customers", href: "/customers", on: is("/customers"), perms: ["sales_all"] },
+    {
+      label: "Customers",
+      href: "/customers",
+      on: is("/customers"),
+      perms: ["sales_all"],
+      subs: [
+        { label: "All Customers", href: "/customers", on: (c) => c.q("v") !== "merge" },
+        { label: "Merge", href: "/customers?v=merge", on: (c) => c.q("v") === "merge", n: mergeable },
+      ],
+    },
   ];
   const PURCHASE: Main[] = [{ label: "Expenses", href: "/expenses", on: is("/expenses"), perms: ["purchase"] }];
   const MASTERS: Main[] = [
@@ -111,6 +123,7 @@ export default function NavBands() {
           {current.subs.map((s) => (
             <Link key={s.label} href={s.href} aria-current={s.on(ctx) ? "page" : undefined} scroll={false}>
               {s.label}
+              {s.n ? <span className="n">{s.n}</span> : null}
             </Link>
           ))}
         </nav>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { money } from "@/lib/format";
 import { useCan } from "@/lib/perms";
 import { summarize, useExpenses, useIssues, useMe, useOrders } from "@/lib/store";
@@ -20,6 +20,9 @@ export default function SalesNav() {
   const all = (orders ?? []).filter((o) => !o.is_internal).length;
   const dash = (v: string | number) => (orders ? v : "…");
 
+  // Adding from Express, International, Exchanges or Internal starts the entry with that box ticked.
+  const f = useSearchParams().get("f");
+  const addFrom = path === "/express" ? "?tick=express" : path === "/international" ? "?tick=international" : path === "/orders" && f === "exchange" ? "?tick=exchange" : path === "/orders" && f === "internal" ? "?tick=internal" : "";
   return (
     <>
       <section className="stats" aria-label="Summary">
@@ -44,7 +47,7 @@ export default function SalesNav() {
       </section>
       {can("sales_all") && can("edit_orders") && path !== "/orders/new" && (
         <div className="subnav-row actions-only">
-          <Link href="/orders/new" className="btn primary small">
+          <Link href={`/orders/new${addFrom}`} className="btn primary small">
             + Add entry
           </Link>
         </div>
