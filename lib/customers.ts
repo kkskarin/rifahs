@@ -26,7 +26,30 @@ export type Customer = {
   names: string[];
   phones: string[];
   addrKeys: string[];
+  /** The address exactly as written on their newest order. */
+  raw: { address1: string; address2: string; city: string; province: string; zip: string; country: string };
 };
+/** Cleaned-up details, saved by Claude or typed by the team (table: customers). */
+export type Profile = {
+  key: string;
+  name: string;
+  phone: string;
+  email: string;
+  address1: string;
+  address2: string;
+  city: string;
+  district: string;
+  state: string;
+  pin: string;
+  country: string;
+  status: "clean" | "review";
+  doubts: string[];
+  source: "claude" | "person";
+  updated_at: string;
+};
+export const PROFILE_FIELDS = ["name", "phone", "email", "address1", "address2", "city", "district", "state", "pin", "country"] as const;
+export type ProfileField = (typeof PROFILE_FIELDS)[number];
+export const FIELD_LABEL: Record<ProfileField, string> = { name: "Name", phone: "Phone", email: "Email", address1: "Address line 1", address2: "Address line 2", city: "City", district: "District", state: "State", pin: "PIN code", country: "Country" };
 export type Reason = "mobile" | "address" | "name";
 export const REASON_LABEL: Record<Reason, string> = { mobile: "Same mobile number", address: "Similar address", name: "Same name" };
 export type MergeGroup = { signature: string; reason: Reason; members: Customer[] };
@@ -68,7 +91,7 @@ export function buildCustomers(orders: OrderRow[], links: Map<string, string>, d
     const a = (o.ship_address ?? {}) as Record<string, string | null>;
     const zip = alnum(a.zip);
     const street = alnum(a.address1);
-    const c = m.get(key) ?? { key, keys: [key], name: "", phone: "", email: "", city: "", address: "", zip: "", orders: 0, total: 0, last: "", names: [], phones: [], addrKeys: [], lastOwn: "" };
+    const c = m.get(key) ?? { key, keys: [key], name: "", phone: "", email: "", city: "", address: "", zip: "", orders: 0, total: 0, last: "", names: [], phones: [], addrKeys: [], lastOwn: "", raw: { address1: "", address2: "", city: "", province: "", zip: "", country: "" } };
     if (!c.keys.includes(base)) c.keys.push(base);
     c.orders += 1;
     c.total += Number(o.total ?? 0);
@@ -91,6 +114,7 @@ export function buildCustomers(orders: OrderRow[], links: Map<string, string>, d
       c.city = o.ship_city ?? c.city;
       c.address = [a.address1, a.city, a.zip].filter(Boolean).join(", ") || c.address;
       c.zip = a.zip ?? c.zip;
+      c.raw = { address1: a.address1 ?? "", address2: a.address2 ?? "", city: a.city ?? o.ship_city ?? "", province: a.province ?? "", zip: a.zip ?? "", country: a.country ?? o.ship_country ?? "" };
     }
     m.set(key, c);
   }
@@ -156,4 +180,31 @@ export async function unmergeCustomer(c: Customer): Promise<R> {
   if (error) return { ok: false, message: error.message };
   await apply((d) => ({ ...d, links: d.links.filter(([, primary]) => primary !== c.key) }));
   return { ok: true, message: `${c.name} is separated again.` };
+}
+
+// ── Cleaned profiles ───────────────────────────────────────────
+export function useProfiles() {
+  return useSWR<Profile[]>(
+    "customer-profiles",
+    async () => {
+      const { data, error } = await sb().from("customers").select("key, name, phone, email, address1, address2, city, district, state, pin, country, status, doubts, source, updated_at").limit(5000);
+      if (error) throw error;
+      return (data ?? []) as Profile[];
+    },
+    { revalidateOnFocus: true, dedupingInterval: 5000, keepPreviousData: true },
+  );
+}
+
+/** What the profile form starts from when nobody has cleaned this customer yet. */
+export const draftFrom = (c: Customer): Record<ProfileField, string> => ({
+  name: c.name, phone: c.phone, email: c.email, address1: c.raw.address1, address2: c.raw.address2, city: c.raw.city || c.city, district: "", state: c.raw.province, pin: c.raw.zip, country: c.raw.country || "India",
+});
+
+export async function saveProfile(key: string, values: Record<ProfileField, string>, userId: string): Promise<R> {
+  const row = { key, ...Object.fromEntries(PROFILE_FIELDS.map((f) => [f, (values[f] ?? "").trim()])), status: "clean", doubts: [], source: "person", updated_at: new Date().toISOString(), updated_by: userId };
+  const { error } = await sb().from("customers").upsert(row);
+  if (error) return { ok: false, message: error.message };
+  // Shown at once, then confirmed from the database.
+  await mutate<Profile[]>("customer-profiles", (cur) => [...(cur ?? []).filter((p) => p.key !== key), row as unknown as Profile], { revalidate: true });
+  return { ok: true, message: "Saved." };
 }

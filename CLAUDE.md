@@ -20,3 +20,9 @@ itself created — tag "Kaleidoscope Core" — from Settings → Shopify). Inter
 sent to Shopify when the box is ticked; they get "(Test)" after the name and a "Test" tag. Never cancel,
 refund or delete any other Shopify order, never change Shopify stock or prices, and never send customer
 emails by default.
+
+## Claude API (Customers → Clean Up)
+`lib/cleanup.ts` sends small batches of customer names, phones and addresses to Claude (official
+`@anthropic-ai/sdk`, structured output) and saves the tidy result in the `customers` table. Needs
+`ANTHROPIC_API_KEY` in Netlify; `CLEANUP_MODEL` optionally overrides the model. It never writes to
+Shopify and never changes orders.

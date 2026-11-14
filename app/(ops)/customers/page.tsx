@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { REASON_LABEL, dismissGroup, mergeCustomers, unmergeCustomer, useCustomers, type Customer, type MergeGroup } from "@/lib/customers";
+import { REASON_LABEL, dismissGroup, mergeCustomers, unmergeCustomer, useCustomers, useProfiles, type Customer, type MergeGroup } from "@/lib/customers";
+import { CleanView, ProfileView } from "@/components/CustomerClean";
 import { money, shortDate } from "@/lib/format";
 import { useCan } from "@/lib/perms";
 import { useMe } from "@/lib/store";
@@ -21,15 +22,31 @@ const COLS: { key: Col; label: string; num?: boolean }[] = [
 
 export default function CustomersPage() {
   const { can } = useCan();
-  const view = useSearchParams().get("v") === "merge" ? "merge" : "all";
+  const sp = useSearchParams();
+  const view = sp.get("v") === "merge" ? "merge" : sp.get("v") === "clean" ? "clean" : "all";
+  const open = sp.get("c");
   const data = useCustomers();
   if (!can("see_contact")) return <p className="empty">Your role doesn&apos;t include customer details. Ask the owner if you need it.</p>;
   if (!data.ready) return <p className="empty">Loading…</p>;
+  if (open) {
+    const c = data.customers.find((x) => x.key === open || x.keys.includes(open));
+    return c ? <ProfileView key={c.key} c={c} /> : <p className="empty">That customer isn&apos;t in the list any more. <Link className="link" href="/customers">All Customers</Link></p>;
+  }
+  if (view === "clean") return <CleanView customers={data.customers} />;
   return view === "merge" ? <MergeView groups={data.groups} /> : <AllView customers={data.customers} />;
 }
 
-function AllView({ customers }: { customers: Customer[] }) {
+function AllView({ customers: listed }: { customers: Customer[] }) {
   const { can } = useCan();
+  // Where a customer has been cleaned up, the list shows the tidy name, phone, email and city.
+  const { data: profiles } = useProfiles();
+  const customers = useMemo(() => {
+    const by = new Map((profiles ?? []).map((p) => [p.key, p]));
+    return listed.map((c) => {
+      const p = by.get(c.key);
+      return p ? { ...c, name: p.name || c.name, phone: p.phone || c.phone, email: p.email || c.email, city: p.city || c.city } : c;
+    });
+  }, [listed, profiles]);
   const showMoney = can("see_amounts");
   const canEdit = can("edit_orders");
   const [q, setQ] = useState("");
@@ -99,7 +116,9 @@ function AllView({ customers }: { customers: Customer[] }) {
                 {shown.slice(0, limit).map((c) => (
                   <tr key={c.key}>
                     <td className="stack-title">
-                      {c.name}
+                      <Link className="link" href={`/customers?c=${encodeURIComponent(c.key)}`} title="Open this customer">
+                        {c.name}
+                      </Link>
                       {c.names.length > 1 && <div className="meta">also: {c.names.filter((x) => x !== c.name).join(", ")}</div>}
                       {c.keys.length > 1 && (
                         <div className="meta">

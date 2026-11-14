@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { CORE_TAG, cancelAndDeleteCoreOrder, changeLineSize, createShopifyOrder, fulfillOrder, shopifyConfigured, updateOrderDetails } from "@/lib/shopify";
 import { syncBudgetMs, syncDeliveries, syncRecent, syncStock } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
+import { cleanWithClaude, cleanupConfigured, type CleanCustomer, type RawCustomer } from "@/lib/cleanup";
 import type { OrderItem, TeamRole } from "@/lib/types";
 
 export type ActionResult = { ok: boolean; message?: string; more?: boolean };
@@ -291,4 +292,45 @@ export async function restartOrderSync(): Promise<ActionResult> {
   if (v.cursor && !v.since) return { ok: true };
   const { error } = await db.from("sync_state").upsert({ key: "shopify_orders", value: {}, updated_at: new Date().toISOString() });
   return error ? { ok: false, message: error.message } : { ok: true };
+}
+
+// ───────────────────────── Customers → Clean Up (Claude) ─────────────────────────
+
+export type CleanStep = { ok: boolean; message?: string; cleaned?: CleanCustomer[]; needsKey?: boolean };
+
+/** Tidy a few customers with Claude and save the result as their profile. Called batch by batch from the screen. */
+export async function cleanCustomersStep(batch: RawCustomer[]): Promise<CleanStep> {
+  const me = await requireMember();
+  if (!cleanupConfigured()) return { ok: false, needsKey: true, message: "Claude isn't connected yet: ANTHROPIC_API_KEY is not set in Netlify." };
+  if (!batch.length || batch.length > 6) return { ok: false, message: "Send between 1 and 6 customers at a time." };
+  const db = supabaseAdmin();
+  // Same rule as the customers table itself: only people who may see and edit customer details.
+  const { data: profile } = await db.from("profiles").select("role, role_key").eq("id", me.id).single();
+  if (profile?.role !== "owner") {
+    const { data: role } = await db.from("roles").select("permissions").eq("key", profile?.role_key ?? profile?.role ?? "").maybeSingle();
+    const p = (role?.permissions ?? {}) as Record<string, boolean>;
+    if (!p.see_contact || !p.edit_orders) return { ok: false, message: "Your role can't clean up customers." };
+  }
+  try {
+    const cleaned = await cleanWithClaude(batch);
+    const rawByKey = new Map(batch.map((c) => [c.key, c]));
+    const rows = cleaned.map((c) => ({
+      key: c.key,
+      name: c.name, phone: c.phone, email: c.email, address1: c.address1, address2: c.address2,
+      city: c.city, district: c.district, state: c.state, pin: c.pin, country: c.country,
+      doubts: c.doubts,
+      status: c.doubts.length ? "review" : "clean",
+      source: "claude",
+      raw: rawByKey.get(c.key) ?? null,
+      updated_at: new Date().toISOString(),
+      updated_by: me.id,
+    }));
+    if (rows.length) {
+      const { error } = await db.from("customers").upsert(rows);
+      if (error) return { ok: false, message: error.message };
+    }
+    return { ok: true, cleaned };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCustomers } from "@/lib/customers";
+import { useCustomers, useProfiles } from "@/lib/customers";
 import { useCan, type PermKey } from "@/lib/perms";
 import { isAdmin } from "@/lib/roles";
 import { useIssues, useMe, useOrders } from "@/lib/store";
@@ -33,6 +33,8 @@ export default function NavBands() {
   const allOrders = (orders ?? []).filter((o) => !o.is_internal).length;
   // How many customers look like duplicates of someone else (shown on the Merge sub tab).
   const mergeable = useCustomers().groups.reduce((a, g) => a + g.members.length, 0);
+  // Customers where Claude had a question for the owner (shown on the Clean Up sub tab).
+  const toAnswer = (useProfiles().data ?? []).filter((p) => p.status === "review").length;
 
   const SALES: Main[] = [
     {
@@ -67,8 +69,9 @@ export default function NavBands() {
       on: is("/customers"),
       perms: ["sales_all"],
       subs: [
-        { label: "All Customers", href: "/customers", on: (c) => c.q("v") !== "merge" },
+        { label: "All Customers", href: "/customers", on: (c) => c.q("v") !== "merge" && c.q("v") !== "clean" },
         { label: "Merge", href: "/customers?v=merge", on: (c) => c.q("v") === "merge", n: mergeable },
+        { label: "Clean Up", href: "/customers?v=clean", on: (c) => c.q("v") === "clean", n: toAnswer },
       ],
     },
   ];

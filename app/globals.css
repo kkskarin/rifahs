@@ -761,3 +761,7 @@ th[aria-sort] .th-sort { color: var(--accent); }
 .merge-card { padding-top: 10px; padding-bottom: 12px; margin-bottom: 12px; }
 .merge-card .master-row input[type="radio"] { accent-color: var(--wine); width: 16px; height: 16px; flex: none; }
 .subband .n { font-size: 12px; font-weight: 600; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; }
+
+/* Clean Up: Claude's questions */
+.doubts { margin: 10px 0; padding: 10px 14px 10px 30px; background: var(--st-new-bg, #fdf0cf); border-radius: 6px; }
+.doubts li { margin: 3px 0; }
