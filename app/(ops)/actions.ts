@@ -9,6 +9,7 @@ import { CORE_TAG, cancelAndDeleteCoreOrder, changeLineSize, createShopifyOrder,
 import { syncBudgetMs, syncDeliveries, syncRecent, syncStock } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
 import { cleanWithClaude, cleanupConfigured, type CleanCustomer, type RawCustomer } from "@/lib/cleanup";
+import { readBillWithClaude, type BillOptions, type BillReading } from "@/lib/billreader";
 import type { OrderItem, TeamRole } from "@/lib/types";
 
 export type ActionResult = { ok: boolean; message?: string; more?: boolean };
@@ -333,6 +334,28 @@ export async function cleanCustomersStep(batch: RawCustomer[]): Promise<CleanSte
       if (error) return { ok: false, message: error.message };
     }
     return { ok: true, cleaned };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+// ───────────────────────── Purchase → read a bill (Claude) ─────────────────────────
+
+export type BillStep = { ok: boolean; message?: string; needsKey?: boolean; bill?: BillReading };
+
+/** Read a photo or PDF of a bill and return the fields for the expense form. Nothing is saved here. */
+export async function readBill(data: string, mediaType: string, opts: BillOptions): Promise<BillStep> {
+  const me = await requireMember();
+  if (!cleanupConfigured()) return { ok: false, needsKey: true, message: "Claude isn't connected yet: ANTHROPIC_API_KEY is not set in Netlify." };
+  if (!data || data.length > 6_500_000) return { ok: false, message: "That file is too large. Use a photo, or a PDF under 4 MB." };
+  const db = supabaseAdmin();
+  const { data: profile } = await db.from("profiles").select("role, role_key").eq("id", me.id).single();
+  if (profile?.role !== "owner") {
+    const { data: role } = await db.from("roles").select("permissions").eq("key", profile?.role_key ?? profile?.role ?? "").maybeSingle();
+    if (!((role?.permissions ?? {}) as Record<string, boolean>).purchase) return { ok: false, message: "Your role can't add purchases." };
+  }
+  try {
+    return { ok: true, bill: await readBillWithClaude(data, mediaType, opts) };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }

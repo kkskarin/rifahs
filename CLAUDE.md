@@ -26,3 +26,5 @@ emails by default.
 `@anthropic-ai/sdk`, structured output) and saves the tidy result in the `customers` table. Needs
 `ANTHROPIC_API_KEY` in Netlify; `CLEANUP_MODEL` optionally overrides the model. It never writes to
 Shopify and never changes orders.
+`lib/billreader.ts` (Purchase → "Read from a bill") sends one bill photo or PDF to Claude and returns
+the fields for the expense form; nothing is saved until the person presses Add expense.

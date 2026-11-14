@@ -781,3 +781,8 @@ th[aria-sort] .th-sort { color: var(--accent); }
 .field > span.phone-input { font-size: inherit; letter-spacing: normal; text-transform: none; color: inherit; }
 .phone-input select { width: 104px; }
 @media (min-width: 640px) { .field.span2 { grid-column: span 2; } }
+
+/* Purchase: read an expense off a bill */
+.bill-read { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.bill-read .btn { cursor: pointer; }
+.bill-read .btn.disabled { opacity: 0.6; cursor: progress; }

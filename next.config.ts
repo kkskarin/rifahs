@@ -11,6 +11,8 @@ try {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Bill photos and PDFs are sent to the server to be read, so allow a larger request than the 1 MB default.
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   // Shown in the ☰ menu so anyone can tell which build their device is running.
   env: {
     NEXT_PUBLIC_COMMIT: COMMIT,
