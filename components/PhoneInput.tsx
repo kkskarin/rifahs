@@ -3,8 +3,8 @@
 import { DIAL_CODES, joinPhone, splitPhone } from "@/lib/places";
 
 /** A phone number as a country code you pick plus the number you type. */
-export default function PhoneInput({ value, onChange, compact, disabled, name }: { value: string; onChange: (v: string) => void; compact?: boolean; disabled?: boolean; name?: string }) {
-  const { code, national } = splitPhone(value);
+export default function PhoneInput({ value, onChange, compact, disabled, name, country }: { value: string; onChange: (v: string) => void; compact?: boolean; disabled?: boolean; name?: string; country?: string | null }) {
+  const { code, national } = splitPhone(value, country);
   const known = DIAL_CODES.some((c) => c.code === code);
   // Keep the code while the number is still empty, so choosing a code first isn't lost.
   const emit = (c: string, n: string) => onChange(n.replace(/\D/g, "") ? joinPhone(c, n, compact) : c === "+91" ? "" : c);

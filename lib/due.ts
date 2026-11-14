@@ -6,7 +6,7 @@ import { sb } from "./supabase-browser";
 import type { Order } from "./types";
 
 export type DueRules = { standard_days: number; express_days: number; unstitched_days: number };
-export const DEFAULT_RULES: DueRules = { standard_days: 21, express_days: 7, unstitched_days: 5 };
+export const DEFAULT_RULES: DueRules = { standard_days: 25, express_days: 7, unstitched_days: 5 };
 
 export function useDueRules() {
   const { data } = useSWR<DueRules>("due-rules", async () => {

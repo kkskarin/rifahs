@@ -167,7 +167,7 @@ function RulesForm({ userId, onDone }: { userId: string; onDone: () => void }) {
         const f = new FormData(e.currentTarget);
         const n = (k: string, d: number) => Math.max(Number(f.get(k)) || d, 0);
         const r = await saveDueRules(
-          { standard_days: n("standard_days", 21), express_days: n("express_days", 7), unstitched_days: n("unstitched_days", 5) },
+          { standard_days: n("standard_days", 25), express_days: n("express_days", 7), unstitched_days: n("unstitched_days", 5) },
           userId,
         );
         if (r.ok) onDone();

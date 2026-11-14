@@ -14,7 +14,7 @@ import { STATUS_LABEL, type OrderStatus } from "@/lib/types";
 const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 const long = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 const STAGES: { key: OrderStatus; label: string }[] = [
-  { key: "new", label: "Order Received" },
+  { key: "new", label: "Open" },
   { key: "printing", label: "Committed to Stitch" },
   { key: "stitching", label: "In Stitching" },
 ];
@@ -64,7 +64,7 @@ export default function StitchingQueuePage() {
         <div className="panel">
           <h3>Stitching queue</h3>
           <p className="hint" style={{ marginTop: -6 }}>
-            Orders received, by item, checked against today&apos;s stock. The earliest due orders get the stock first: a size that is On Hand is
+            Open orders, by item, checked against today&apos;s stock. The earliest due orders get the stock first: a size that is On Hand is
             used before fabric, fabric On Hand is stitched next, and anything left over is flagged as fabric needed.
           </p>
           <div className="grid filters">

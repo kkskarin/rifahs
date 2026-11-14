@@ -12,7 +12,7 @@ import { OPEN_STATUSES, STATUS_LABEL, isClosed, type Order, type OrderStatus } f
 // The eight views asked for, plus Dispatched (in transit) which sits between Ready and Delivered.
 type Bucket = "new" | "printing" | "stitching" | "checking" | "ready" | "dispatched" | "delivered" | "issue" | "closed" | "void";
 const BUCKETS: { key: Bucket; label: string }[] = [
-  { key: "new", label: "Order Received" },
+  { key: "new", label: "Open" },
   { key: "printing", label: "Committed to Stitch" },
   { key: "stitching", label: "In Stitching" },
   { key: "checking", label: "Committed to Dispatch" },

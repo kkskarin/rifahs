@@ -33,10 +33,16 @@ export const DIAL_CODES: { code: string; country: string }[] = [
 ];
 
 /** Split any way a number was written into its country code and the rest ("09876543210" → +91, 9876543210). */
-export function splitPhone(raw: string | null | undefined): { code: string; national: string } {
+export const dialCodeFor = (country: string | null | undefined) => {
+  const k = (country ?? "").trim().toLowerCase();
+  return k ? (DIAL_CODES.find((c) => c.country.toLowerCase().split(" / ").includes(k))?.code ?? null) : null;
+};
+/** `country` is only a hint for numbers written without a country code (an Australian order's "0424…" is +61, not +91). */
+export function splitPhone(raw: string | null | undefined, country?: string | null): { code: string; national: string } {
   const t = (raw ?? "").trim();
   const digits = t.replace(/\D/g, "");
-  if (!digits) return { code: "+91", national: "" };
+  const home = dialCodeFor(country) ?? "+91";
+  if (!digits) return { code: home, national: "" };
   if (t.startsWith("+") || t.startsWith("00")) {
     const d = t.startsWith("00") ? digits.slice(2) : digits;
     // Longest matching code wins (+971 before +97…, +1 last).
@@ -44,14 +50,24 @@ export function splitPhone(raw: string | null | undefined): { code: string; nati
     if (hit) return { code: hit.code, national: d.slice(hit.code.length - 1) };
     return { code: "+" + d.slice(0, Math.max(d.length - 10, 1)), national: d.slice(Math.max(d.length - 10, 1)) };
   }
+  if (home !== "+91") return { code: home, national: digits.replace(/^0+/, "") };
   if (digits.length === 12 && digits.startsWith("91")) return { code: "+91", national: digits.slice(2) };
   if (digits.length === 11 && digits.startsWith("0")) return { code: "+91", national: digits.slice(1) };
   return { code: "+91", national: digits };
 }
 /** "+91 98765 43210" for reading; pass compact for "+919876543210" (what Shopify stores). */
 export function joinPhone(code: string, national: string, compact = false): string {
-  const n = national.replace(/\D/g, "");
+  // A leading 0 is only used when dialling inside the country ("0424…" → +61 424…). Italy is the exception.
+  const n = code === "+39" ? national.replace(/\D/g, "") : national.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
   if (!n) return "";
   if (compact) return code + n;
   return `${code} ${code === "+91" && n.length === 10 ? `${n.slice(0, 5)} ${n.slice(5)}` : n}`;
 }
+
+/** ISO codes for the countries in the list (Shopify addresses need the code, not the name). */
+export const COUNTRY_ISO: Record<string, string> = {
+  India: "IN", "United Arab Emirates": "AE", "United States": "US", "United Kingdom": "GB", Singapore: "SG", Malaysia: "MY", Australia: "AU", Canada: "CA",
+  "Saudi Arabia": "SA", Qatar: "QA", Kuwait: "KW", Oman: "OM", Bahrain: "BH", "Sri Lanka": "LK", Germany: "DE", France: "FR", Netherlands: "NL", Ireland: "IE",
+  "New Zealand": "NZ", Switzerland: "CH", Sweden: "SE", Italy: "IT", Spain: "ES", Japan: "JP", "Hong Kong": "HK", "South Africa": "ZA", Mauritius: "MU",
+  Maldives: "MV", Bangladesh: "BD", Nepal: "NP",
+};

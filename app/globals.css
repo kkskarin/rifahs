@@ -776,3 +776,8 @@ th[aria-sort] .th-sort { color: var(--accent); }
 .cust-find li + li { border-top: 1px solid var(--line); }
 .cust-find li button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; font: inherit; color: inherit; cursor: pointer; }
 .cust-find li button:hover, .cust-find li button:focus-visible { background: rgb(var(--ink-rgb) / 0.05); }
+
+/* The phone box sits where a field label would, so undo the label look (small capitals) for it. */
+.field > span.phone-input { font-size: inherit; letter-spacing: normal; text-transform: none; color: inherit; }
+.phone-input select { width: 104px; }
+@media (min-width: 640px) { .field.span2 { grid-column: span 2; } }

@@ -1,4 +1,5 @@
 import "server-only";
+import { COUNTRY_ISO } from "./places";
 
 // Reads orders and stock from Shopify. Writes are limited to what the owner asked for:
 //  - createShopifyOrder(): a manual entry made in Core becomes a Shopify order
@@ -190,6 +191,9 @@ export type NewShopifyOrder = {
   taxType?: "" | "cgst_sgst" | "igst";
   shipping?: number;
   paid: boolean;
+  /** Money already received and the order total, so Shopify records a payment instead of only a "Paid" label. */
+  paidAmount?: number;
+  total?: number;
   note: string;
   tags: string[];
 };
@@ -259,10 +263,17 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
   const hasAddress = Boolean(a?.address1 && a?.city);
   const india = !a?.country || /^(india|in|bharat)$/i.test(a.country.trim());
   const stateCode = IN_STATES[(a?.province ?? "").trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
+  const received = Math.max(o.paid ? (o.total ?? o.paidAmount ?? 0) : (o.paidAmount ?? 0), 0);
+  // Attach the customer (found by email or phone, or created), so the order is not left with "No customer".
+  const customer = o.email || o.phone ? { toUpsert: { firstName: first, lastName: last, ...(o.email ? { email: o.email } : {}), ...(o.phone ? { phone: o.phone } : {}) } } : null;
   const order: Record<string, unknown> = {
     currency: "INR",
     lineItems,
-    financialStatus: o.paid ? "PAID" : "PENDING",
+    financialStatus: o.paid ? "PAID" : received > 0 ? "PARTIALLY_PAID" : "PENDING",
+    // Record the money as a manual payment, so Shopify shows the amount paid and no balance to collect.
+    ...(received > 0
+      ? { transactions: [{ kind: "SALE", status: "SUCCESS", gateway: "manual", amountSet: { shopMoney: { amount: received.toFixed(2), currencyCode: "INR" } } }] }
+      : {}),
     ...(o.taxMode && o.taxMode !== "none" ? { taxesIncluded: o.taxMode === "inclusive" } : {}),
     ...(o.shipping && o.shipping > 0
       ? { shippingLines: [{ title: "Standard", priceSet: { shopMoney: { amount: o.shipping.toFixed(2), currencyCode: "INR" } } }] }
@@ -278,26 +289,42 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
             lastName: last,
             address1: a!.address1,
             city: a!.city,
-            ...(india ? { countryCode: "IN" } : { country: a!.country }),
-            ...(india && stateCode ? { provinceCode: stateCode } : a!.province ? { address2: a!.province } : {}),
+            ...(india ? { countryCode: "IN" } : COUNTRY_ISO[(a!.country ?? "").trim()] ? { countryCode: COUNTRY_ISO[(a!.country ?? "").trim()] } : { country: a!.country }),
+            // Other countries: Shopify takes the state as a short code ("NSW"); a full name goes on address line 2 so it isn't lost.
+            ...(india && stateCode ? { provinceCode: stateCode } : a!.province ? (/^[A-Za-z]{2,3}$/.test(a!.province.trim()) ? { provinceCode: a!.province.trim().toUpperCase() } : { address2: a!.province }) : {}),
             zip: a!.zip || undefined,
             phone: o.phone || undefined,
           },
         }
       : {}),
   };
-  const data = await shopifyGraphQL<{
-    orderCreate: { userErrors: { field: string[] | null; message: string }[]; order: { legacyResourceId: string; name: string } | null };
-  }>(
-    `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
+  type Created = { orderCreate: { userErrors: { field: string[] | null; message: string }[]; order: { legacyResourceId: string; name: string } | null } };
+  const send = (body: Record<string, unknown>) =>
+    shopifyGraphQL<Created>(
+      `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
       orderCreate(order: $order, options: $options) { userErrors { field message } order { legacyResourceId name } }
     }`,
-    // No emails to the customer; stock is only reduced for items matched to a real variant.
-    { order, options: { sendReceipt: false, sendFulfillmentReceipt: false, inventoryBehaviour: matched ? "DECREMENT_IGNORING_POLICY" : "BYPASS" } },
-  );
+      // No emails to the customer; stock is only reduced for items matched to a real variant.
+      { order: body, options: { sendReceipt: false, sendFulfillmentReceipt: false, inventoryBehaviour: matched ? "DECREMENT_IGNORING_POLICY" : "BYPASS" } },
+    );
+  const failed = (d: Created) => d.orderCreate.userErrors.length > 0 || !d.orderCreate.order;
+  let data: Created;
+  let customerNote = "";
+  try {
+    data = await send(customer ? { ...order, customer } : order);
+    // If Shopify objects to the customer part (no permission, or the phone/email clashes), create the order without it.
+    if (customer && failed(data) && data.orderCreate.userErrors.some((e) => /customer|phone|email/i.test(`${(e.field ?? []).join(".")} ${e.message}`))) {
+      customerNote = data.orderCreate.userErrors.map((e) => e.message).join("; ");
+      data = await send(order);
+    }
+  } catch (e) {
+    if (!customer || !/customer|access denied|scope/i.test((e as Error).message)) throw e;
+    customerNote = (e as Error).message;
+    data = await send(order);
+  }
   const errs = data.orderCreate.userErrors;
   if (errs.length || !data.orderCreate.order) throw new Error(errs.map((e) => e.message).join("; ") || "Shopify did not create the order");
-  return { id: Number(data.orderCreate.order.legacyResourceId), name: data.orderCreate.order.name, matched, total: o.items.length };
+  return { id: Number(data.orderCreate.order.legacyResourceId), name: data.orderCreate.order.name, matched, total: o.items.length, customerNote };
 }
 
 // ── Stock (read-only) ──────────────────────────────────────────

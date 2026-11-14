@@ -235,7 +235,7 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
 
       <div className="inv-grid">
         <div className="counter" title="Ordered pieces not yet sent for stitching">
-          <span>Orders received</span>
+          <span>Open orders</span>
           <b>{d?.waitingQty ?? 0}</b>
           {d && d.inWorkQty > 0 && <small>+{d.inWorkQty} already in work</small>}
         </div>

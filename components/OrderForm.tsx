@@ -16,6 +16,7 @@ export default function OrderForm({ order }: { order?: Order }) {
   const { data: me } = useMe();
   const [busy, setBusy] = useState(false);
   const [phone, setPhone] = useState(order?.customer_phone ?? "");
+  const [express, setExpress] = useState(Boolean(order?.is_express));
   const [state, setState] = useState<{ ok: boolean; message?: string; id?: string } | null>(null);
   const fromShopify = Boolean(order?.shopify_id);
   const sizes = new Set(order?.items.map((i) => i.size).filter(Boolean));
@@ -91,9 +92,9 @@ export default function OrderForm({ order }: { order?: Order }) {
           <span>Customer</span>
           <input name="customer_name" required defaultValue={order?.customer_name} />
         </label>
-        <label className="field">
+        <label className="field span2">
           <span>Phone</span>
-          <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact />
+          <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact country={order?.ship_country} />
         </label>
         <label className="field">
           <span>Email</span>
@@ -188,8 +189,8 @@ export default function OrderForm({ order }: { order?: Order }) {
             <input name="zip" inputMode="numeric" defaultValue={(order?.ship_address as Record<string, string> | null)?.zip ?? ""} />
           </label>
         <label className="field">
-          <span>Promise date</span>
-          <input name="promise_date" type="date" defaultValue={order?.promise_date ?? ""} />
+          <span>Shipping due date{express ? " *" : ""}</span>
+          <input name="promise_date" type="date" required={express} defaultValue={order?.promise_date ?? ""} />
         </label>
         <label className="field">
           <span>Ship to country</span>
@@ -211,7 +212,7 @@ export default function OrderForm({ order }: { order?: Order }) {
 
         <div className="field full" style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
           <label className="checkbox">
-            <input type="checkbox" name="is_express" defaultChecked={order?.is_express} /> Express
+            <input type="checkbox" name="is_express" checked={express} onChange={(e) => setExpress(e.target.checked)} /> Express
           </label>
           <label className="checkbox">
             <input type="checkbox" name="is_international" defaultChecked={order?.is_international} /> International

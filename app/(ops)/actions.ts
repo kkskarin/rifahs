@@ -122,6 +122,8 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
       taxType: o.tax_type ?? "",
       shipping,
       paid: fullyPaid,
+      paidAmount,
+      total,
       note: [o.notes ?? "", paymentNote].filter(Boolean).join("\n"),
       tags: [CORE_TAG, o.is_internal ? "Test" : "", o.channel, o.is_express ? "Express" : "", o.is_exchange ? "Exchange" : ""].filter(Boolean),
     });
@@ -131,7 +133,8 @@ export async function pushOrderToShopify(orderId: string): Promise<ActionResult>
       .eq("id", orderId);
     await db.from("order_events").insert({ order_id: orderId, kind: "shopify_sync", message: `Created in Shopify as ${r.name}`, actor: me.id });
     const note = r.matched < r.total ? ` (${r.total - r.matched} item${r.total - r.matched === 1 ? "" : "s"} added as custom lines — no matching product/size found)` : "";
-    return { ok: true, message: `Created in Shopify as ${r.name}${note}` };
+    const cust = r.customerNote ? ` The customer could not be attached (${r.customerNote.replace(/^Shopify API error: /, "").slice(0, 120)}), so add them on the Shopify order.` : "";
+    return { ok: true, message: `Created in Shopify as ${r.name}${note}.${cust}` };
   } catch (e) {
     const m = (e as Error).message;
     if (/access denied|write_orders|scope/i.test(m))

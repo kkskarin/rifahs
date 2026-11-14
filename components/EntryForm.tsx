@@ -7,6 +7,7 @@ import { mutate } from "swr";
 import { lookupPin, pushOrderToShopify } from "@/app/(ops)/actions";
 import { COUNTRIES, IN_STATE_NAMES, matchState } from "@/lib/places";
 import PhoneInput from "@/components/PhoneInput";
+import { useDueRules } from "@/lib/due";
 import { useCustomers, useProfiles, type Customer, type Profile } from "@/lib/customers";
 import { entryTotals, taxTypeFor, type EntryLine } from "@/lib/entry";
 import { money } from "@/lib/format";
@@ -41,6 +42,9 @@ export default function EntryForm({ order }: { order?: Order }) {
   const [district, setDistrict] = useState(addr?.district ?? "");
   const [pin, setPin] = useState(addr?.zip ?? "");
   const [pinNote, setPinNote] = useState("");
+  // An express order must carry its shipping due date; others default to the standard number of days.
+  const [express, setExpress] = useState(order ? Boolean(order.is_express) : tick === "express");
+  const rules = useDueRules();
   const [custName, setCustName] = useState(order?.customer_name ?? "");
   const [phone, setPhone] = useState(order?.customer_phone ?? "");
   const [email, setEmail] = useState(order?.customer_email ?? "");
@@ -240,9 +244,9 @@ export default function EntryForm({ order }: { order?: Order }) {
           <span>Name</span>
           <input name="customer_name" required value={custName} onChange={(e) => setCustName(e.target.value)} />
         </label>
-        <label className="field">
+        <label className="field span2">
           <span>Phone</span>
-          <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact />
+          <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact country={country} />
         </label>
         <label className="field">
           <span>Email</span>
@@ -488,8 +492,9 @@ export default function EntryForm({ order }: { order?: Order }) {
           </>
         )}
         <label className="field">
-          <span>Delivery due date</span>
-          <input name="promise_date" type="date" defaultValue={order?.promise_date ?? ""} />
+          <span>Shipping due date{express ? " *" : ""}</span>
+          <input name="promise_date" type="date" required={express} defaultValue={order?.promise_date ?? ""} />
+          <small className="hint" style={{ margin: 0 }}>{express ? "Needed for an express order." : `Leave blank for the usual ${rules.standard_days} days from the order date.`}</small>
         </label>
         <label className="field">
           <span>Status</span>
@@ -515,7 +520,7 @@ export default function EntryForm({ order }: { order?: Order }) {
         </label>
         <div className="field full" style={{ display: "flex", gap: "8px 22px", flexWrap: "wrap" }}>
           <label className="checkbox">
-            <input type="checkbox" name="is_express" defaultChecked={order ? order.is_express : tick === "express"} /> Express
+            <input type="checkbox" name="is_express" checked={express} onChange={(e) => setExpress(e.target.checked)} /> Express
           </label>
           <label className="checkbox">
             <input type="checkbox" name="is_international" defaultChecked={order ? order.is_international : tick === "international"} /> International

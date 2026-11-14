@@ -38,10 +38,10 @@ export function ProfileForm({ c, profile, onSaved }: { c: Customer; profile?: Pr
     >
       <div className="grid">
         {PROFILE_FIELDS.map((f) => (
-          <label key={f} className={`field${wide.includes(f) ? " full" : ""}`}>
+          <label key={f} className={`field${wide.includes(f) ? " full" : f === "phone" ? " span2" : ""}`}>
             <span>{FIELD_LABEL[f]}</span>
             {f === "phone" ? (
-              <PhoneInput value={v.phone} disabled={!canEdit} onChange={(p) => setV((x) => ({ ...x, phone: p }))} />
+              <PhoneInput value={v.phone} disabled={!canEdit} country={v.country} onChange={(p) => setV((x) => ({ ...x, phone: p }))} />
             ) : (
             <input value={v[f]} disabled={!canEdit} onChange={(e) => setV((x) => ({ ...x, [f]: e.target.value }))} inputMode={f === "pin" ? "numeric" : f === "email" ? "email" : undefined} />
             )}

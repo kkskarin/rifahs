@@ -51,7 +51,7 @@ export const FLOW: OrderStatus[] = ["new", "printing", "stitching", "checking", 
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
   // Stage names from the inventory spec. The stored keys are unchanged.
-  new: "Order Received",
+  new: "Open",
   printing: "Committed to Stitch",
   stitching: "In Stitching",
   checking: "Committed to Dispatch",
