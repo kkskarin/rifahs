@@ -39,15 +39,10 @@ export default function DisputesPage() {
     <>
       <SalesNav />
       <p className="hint" style={{ marginTop: 0 }}>Courier problems and customer complaints, from the moment they&apos;re raised until they&apos;re closed.</p>
-      <div className="subnav-row">
-        <nav className="tabs" aria-label="Disputes">
-          {(["shipping", "customer"] as Cat[]).map((c) => (
-            <Link key={c} href={`/disputes?t=${c}`} className="tab" aria-current={cat === c ? "page" : undefined} replace scroll={false}>
-              {c === "shipping" ? "Shipping" : "Customer"}
-              {count(c) ? <span className="n hot">{count(c)}</span> : null}
-            </Link>
-          ))}
-        </nav>
+      <div className="subnav-row actions-only">
+        <span className="hint" style={{ margin: "0 auto 8px 0" }}>
+          {count(cat)} open {cat === "shipping" ? "shipping" : "customer"} dispute{count(cat) === 1 ? "" : "s"}
+        </span>
         <button className="btn primary small" onClick={() => setRaising((r) => !r)}>
           + Raise dispute
         </button>

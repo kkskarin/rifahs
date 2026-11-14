@@ -46,13 +46,6 @@ export default function MastersPage() {
         <h1>Masters</h1>
         <p>The lists everything else picks from: designs, expense categories and vendors.</p>
       </div>
-      <nav className="tabs" aria-label="Masters">
-        {TABS.map((t) => (
-          <Link key={t.key} href={`/masters?m=${t.key}`} className="tab" aria-current={tab === t.key ? "page" : undefined} replace scroll={false}>
-            {t.label}
-          </Link>
-        ))}
-      </nav>
     </>
   );
   if (tab === "categories" && money) return <>{head}<CategoryMaster canEdit={admin} /></>;

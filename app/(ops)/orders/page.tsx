@@ -99,14 +99,6 @@ export default function OrdersPage() {
           </button>
         )}
       </div>
-      <nav className="chips" aria-label="Express and international">
-        <Link className="chip" href="/express">
-          Express due
-        </Link>
-        <Link className="chip" href="/international">
-          International
-        </Link>
-      </nav>
       <nav className="chips" aria-label="Filter by status">
         {chips.map((c) => (
           <Link key={c.f} className="chip" aria-current={c.f === f ? "true" : undefined} href={href(c.f)} scroll={false} replace>

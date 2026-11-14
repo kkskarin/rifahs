@@ -23,13 +23,6 @@ export default function SettingsTabs() {
       <div className="page-head">
         <h1>Settings</h1>
       </div>
-      <nav className="tabs" aria-label="Settings">
-        {TABS.filter((t) => (!t.adminOnly || admin) && (!("ownerOnly" in t) || me?.role === "owner")).map((t) => (
-          <Link key={t.href} href={t.href} className="tab" aria-current={path === t.href ? "page" : undefined}>
-            {t.label}
-          </Link>
-        ))}
-      </nav>
     </>
   );
 }

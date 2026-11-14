@@ -15,11 +15,7 @@ export default function InternationalPage() {
   return (
     <>
       <SalesNav />
-      <p style={{ margin: "0 0 10px" }}>
-        <a className="link" href="/orders">
-          ← All Sales
-        </a>
-      </p>
+
       <nav className="chips">
         <button className="chip" aria-current={!all ? "true" : undefined} onClick={() => setAll(false)}>
           <b>In progress</b>

@@ -84,6 +84,7 @@ export const PATH_PERM: [string, PermKey][] = [
   ["/order", "sales_all"],
   ["/express", "sales_all"],
   ["/international", "sales_all"],
+  ["/customers", "sales_all"],
   ["/status", "sales_status"],
   ["/disputes", "sales_disputes"],
   ["/stitching", "stitching"],

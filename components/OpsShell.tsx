@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ReloadButton, UpdateBar } from "@/components/Reload";
+import NavBands from "@/components/NavBands";
 import { permForPath, useCan, type PermKey } from "@/lib/perms";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -14,8 +15,8 @@ export const APP_NAME = "Kaleidoscope · Core";
 
 type Header = { label: string; href: string; match: string[]; perms: PermKey[] };
 export const HEADERS: Header[] = [
-  // Sales holds All Sales, Order Status and Disputes as sub-tabs (components/SalesNav.tsx).
-  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order", "/status", "/disputes"], perms: ["sales_all", "sales_status", "sales_disputes", "stitching"] },
+  // Header tabs. Each one's main tabs and sub tabs are in components/NavBands.tsx.
+  { label: "Sales", href: "/orders", match: ["/orders", "/express", "/international", "/stitching", "/order", "/status", "/disputes", "/customers"], perms: ["sales_all", "sales_status", "sales_disputes", "stitching"] },
   // "Purchase" is the expenses book (what was spent, on what, to whom).
   { label: "Purchase", href: "/expenses", match: ["/expenses"], perms: ["purchase"] },
   { label: "Inventory", href: "/inventory", match: ["/inventory"], perms: ["inventory"] },
@@ -169,6 +170,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      <Suspense fallback={null}>{me && ready ? <NavBands /> : null}</Suspense>
       <UpdateBar />
       <main className="page">
         <Suspense fallback={<p className="empty">Loading…</p>}>{!me || !ready ? <p className="empty">Loading…</p> : allowed ? children : <p className="empty">Your role doesn&apos;t include this page. Ask the owner if you need it.</p>}</Suspense>

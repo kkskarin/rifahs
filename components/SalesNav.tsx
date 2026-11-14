@@ -20,15 +20,6 @@ export default function SalesNav() {
   const all = (orders ?? []).filter((o) => !o.is_internal).length;
   const dash = (v: string | number) => (orders ? v : "…");
 
-  const SALES_PATHS = ["/orders", "/order", "/orders/new", "/express", "/international", "/stitching"];
-  const tabs = (
-    [
-      { href: "/orders", label: "All Sales", n: all, on: SALES_PATHS.includes(path), perm: "sales_all" },
-      { href: "/status", label: "Order Status", on: path === "/status", perm: "sales_status" },
-      { href: "/disputes", label: "Disputes", n: openIssues, hot: openIssues > 0, on: path === "/disputes", perm: "sales_disputes" },
-    ] as { href: string; label: string; n?: number; hot?: boolean; on: boolean; perm: "sales_all" | "sales_status" | "sales_disputes" }[]
-  ).filter((t) => can(t.perm));
-
   return (
     <>
       <section className="stats" aria-label="Summary">
@@ -51,28 +42,13 @@ export default function SalesNav() {
           <div className="value">{issues ? openIssues : "…"}</div>
         </Link>
       </section>
-      <div className="subnav-row">
-        <nav className="tabs" aria-label="Sales">
-          {tabs.map((t) => (
-            <Link key={t.href} href={t.href} className="tab" aria-current={t.on ? "page" : undefined}>
-              {t.label}
-              {t.n ? <span className={`n${t.hot ? " hot" : ""}`}>{t.n}</span> : null}
-            </Link>
-          ))}
-        </nav>
-        <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {can("stitching") && (
-            <Link href="/stitching" className="btn ghost small" aria-current={path === "/stitching" ? "page" : undefined}>
-              Stitching queue
-            </Link>
-          )}
-          {can("sales_all") && can("edit_orders") && (
-            <Link href="/orders/new" className="btn primary small">
-              + Add entry
-            </Link>
-          )}
-        </span>
-      </div>
+      {can("sales_all") && can("edit_orders") && path !== "/orders/new" && (
+        <div className="subnav-row actions-only">
+          <Link href="/orders/new" className="btn primary small">
+            + Add entry
+          </Link>
+        </div>
+      )}
     </>
   );
 }

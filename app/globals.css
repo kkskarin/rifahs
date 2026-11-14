@@ -732,3 +732,24 @@ span.status-select { display: inline-block; white-space: nowrap; }
 .stage-chip { border: 1px solid var(--line-strong); border-radius: 4px; padding: 2px 8px; font-size: 13px; white-space: nowrap; }
 .stage-chip b { font-weight: 600; }
 .stage-chip.zero { opacity: 0.5; }
+
+/* ── Three levels of navigation ──
+   header tabs (top bar) · main tabs (dark band) · sub tabs (light row) */
+.navbands { position: relative; z-index: 1; }
+.mainband, .subband { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 calc(var(--gutter) - 14px); }
+.mainband::-webkit-scrollbar, .subband::-webkit-scrollbar { display: none; }
+.mainband { background: #2a1416; }
+.mainband a {
+  color: rgb(244 234 196 / 0.72); text-decoration: none; white-space: nowrap; font-size: 15px; font-weight: 500;
+  padding: 15px 14px 12px; border-bottom: 3px solid transparent; display: inline-flex; align-items: center; gap: 8px;
+}
+.mainband a:hover { color: #f4eac4; }
+.mainband a[aria-current="page"] { color: #fff; border-bottom-color: #d9a441; }
+.mainband .n { font-size: 12px; font-weight: 600; min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 999px; background: rgb(244 234 196 / 0.16); color: #f4eac4; }
+.mainband .n.hot { background: #f4eac4; color: #822537; }
+.subband { background: var(--surface, var(--cream-soft)); border-bottom: 1px solid var(--line); }
+.subband a { color: var(--muted); text-decoration: none; white-space: nowrap; font-size: 14.5px; font-weight: 500; padding: 13px 14px 11px; border-bottom: 2px solid transparent; }
+.subband a:hover { color: var(--text); }
+.subband a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+/* The buttons that used to sit beside the old tab row */
+.subnav-row.actions-only { border-bottom: 0; justify-content: flex-end; margin-bottom: 14px; }
