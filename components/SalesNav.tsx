@@ -45,7 +45,8 @@ export default function SalesNav() {
           <div className="value">{issues ? openIssues : "…"}</div>
         </Link>
       </section>
-      {can("sales_all") && can("edit_orders") && path !== "/orders/new" && (
+      {/* Only where orders are listed: All Sales → Orders, Express and International. */}
+      {can("sales_all") && can("edit_orders") && ["/orders", "/express", "/international"].includes(path) && (
         <div className="subnav-row actions-only">
           <Link href={`/orders/new${addFrom}`} className="btn primary small">
             + Add entry
