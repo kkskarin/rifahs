@@ -1,8 +1,9 @@
 # Things to do (noted 12 Nov 2026 — not started; remind the owner before building)
 
 1. **Expense detail** — a fuller expense record, including picture / PDF upload (bills, receipts).
-   (Part done on preview, 14 Nov: a bill photo or PDF can be READ by Claude to fill the expense form.
-   The file itself is not stored with the expense yet.)
+   (Done on preview, 14 Nov: a bill picture, PDF or text file is read by Claude to fill the expense form,
+   pictures are compressed to under 1 MB, and the file is kept with the expense — "Bill" link in the list.
+   Not done: attaching a bill to an expense that already exists; PDFs over 1 MB are kept as they are.)
 2. **Stitching link for vendors** — a link the stitching vendor can open (to see their queue).
 3. **Detailed reports for actionable insights.**
 4. **Picture upload for shippers other than Delhivery** (e.g. ST Courier receipts / proof of dispatch).

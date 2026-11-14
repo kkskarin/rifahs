@@ -176,6 +176,9 @@ export type Expense = {
   created_at: string;
   category_id: string | null;
   vendor_id: string | null;
+  /** The bill or receipt kept with this expense (private storage bucket "bills"). */
+  bill_path?: string | null;
+  bill_name?: string | null;
 };
 export type ExpenseCategory = { id: string; name: string; parent_id: string | null; sort: number };
 export type Vendor = { id: string; name: string; phone: string; notes: string; vendor_type: string; default_category_id: string | null };

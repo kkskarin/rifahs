@@ -8,7 +8,7 @@ import { VendorLinkFields } from "@/components/MoneyMasters";
 import { saveVendor } from "@/lib/money";
 import type { Profile } from "@/lib/types";
 import { money, shortDate, todayIST } from "@/lib/format";
-import { addExpense, categoryLabel, categoryTree, downloadExpensesCsv, useExpenseCategories, useVendors } from "@/lib/money";
+import { addExpense, openBill, categoryLabel, categoryTree, downloadExpensesCsv, useExpenseCategories, useVendors } from "@/lib/money";
 import { useCan } from "@/lib/perms";
 import { deleteExpense, useExpenses, useMe } from "@/lib/store";
 
@@ -261,7 +261,17 @@ export default function ExpensesPage() {
                       {shortDate(e.spent_on)}
                     </td>
                     <td data-label="Category">{categoryLabel(cats, e.category_id, e.category)}</td>
-                    <td data-label="Vendor">{vendorName(e.vendor_id, e.paid_to)}</td>
+                    <td data-label="Vendor">
+                      {vendorName(e.vendor_id, e.paid_to)}
+                      {e.bill_path && (
+                        <>
+                          {" "}
+                          <button className="link" onClick={() => openBill(e.bill_path!)} title={e.bill_name ?? "Bill"}>
+                            Bill
+                          </button>
+                        </>
+                      )}
+                    </td>
                     <td className="hint" data-label="Note">
                       {e.note}
                     </td>
@@ -284,28 +294,55 @@ export default function ExpensesPage() {
   );
 }
 
-/** A phone photo is several megabytes; shrink it before sending. PDFs go as they are. */
-async function fileForReading(file: File): Promise<{ data: string; type: string }> {
-  const b64 = (buf: ArrayBuffer) => {
-    let bin = "";
-    const bytes = new Uint8Array(buf);
-    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return btoa(bin);
-  };
-  if (file.type === "application/pdf") {
-    if (file.size > 4_000_000) throw new Error("That PDF is over 4 MB. Take a photo of the bill instead.");
-    return { data: b64(await file.arrayBuffer()), type: "application/pdf" };
+const KEEP_UNDER = 1_000_000; // files are kept at under 1 MB
+type Picked = { data: string; type: string; blob: Blob; name: string; note: string };
+const b64 = (buf: ArrayBuffer) => {
+  let bin = "";
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
+const kb = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(Math.round(n / 1000), 1)} KB`);
+
+/**
+ * Get a chosen file ready: a picture is shrunk until it is under 1 MB; PDFs and text files are small
+ * enough to keep as they are (a PDF cannot be shrunk in the browser, so those are capped at 4 MB).
+ */
+async function prepareFile(file: File): Promise<Picked> {
+  const name = file.name || "bill";
+  if (file.type === "application/pdf" || /\.pdf$/i.test(name)) {
+    if (file.size > 4_000_000) throw new Error("That PDF is over 4 MB and a PDF can't be made smaller here. Take a photo or a screenshot of the bill instead.");
+    return { data: b64(await file.arrayBuffer()), type: "application/pdf", blob: file, name, note: file.size > KEEP_UNDER ? `Kept as it is (${kb(file.size)}): a PDF can't be compressed here.` : "" };
   }
-  if (!file.type.startsWith("image/")) throw new Error("Use a photo or a PDF.");
-  const img = await createImageBitmap(file);
-  const scale = Math.min(1, 1800 / Math.max(img.width, img.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.width * scale);
-  canvas.height = Math.round(img.height * scale);
-  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
-  if (!blob) throw new Error("Couldn't open that picture.");
-  return { data: b64(await blob.arrayBuffer()), type: "image/jpeg" };
+  if (file.type.startsWith("text/") || /\.(txt|csv|tsv|md|json|xml|html?)$/i.test(name)) {
+    const text = (await file.text()).slice(0, 200_000);
+    return { data: text, type: "text/plain", blob: new Blob([text], { type: "text/plain" }), name, note: "" };
+  }
+  if (file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(name)) {
+    let img: ImageBitmap;
+    try {
+      img = await createImageBitmap(file);
+    } catch {
+      throw new Error("This picture format can't be opened in this browser. Take a screenshot of it, or save it as JPG.");
+    }
+    let blob: Blob | null = null;
+    // Start large and sharp; step down until it fits.
+    for (const [side, quality] of [[2000, 0.85], [1800, 0.8], [1600, 0.75], [1400, 0.7], [1200, 0.65], [1000, 0.6]] as const) {
+      const scale = Math.min(1, side / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
+      if (blob && blob.size < KEEP_UNDER) break;
+    }
+    if (!blob) throw new Error("Couldn't open that picture.");
+    return { data: b64(await blob.arrayBuffer()), type: "image/jpeg", blob, name: name.replace(/\.[^.]+$/, "") + ".jpg", note: file.size > KEEP_UNDER ? `Compressed from ${kb(file.size)} to ${kb(blob.size)}.` : "" };
+  }
+  throw new Error("That kind of file can't be read. Use a picture, a PDF or a text file. For Word or Excel, save it as PDF first.");
 }
 
 function ExpenseForm({ me }: { me: Profile }) {
@@ -322,12 +359,16 @@ function ExpenseForm({ me }: { me: Profile }) {
   // A vendor read off a bill that isn't in the list yet: added to the vendors master when the expense is saved.
   const [newVendor, setNewVendor] = useState("");
   const [bill, setBill] = useState<{ busy?: boolean; ok?: boolean; text?: string; doubts?: string[]; needsKey?: boolean }>({});
+  // The file itself, kept with the expense when it is saved.
+  const [kept, setKept] = useState<Picked | null>(null);
 
   // Read a photo or PDF of a bill with Claude and fill the form. Nothing is saved until "Add expense" is pressed.
   const readFromBill = async (file: File) => {
     setBill({ busy: true });
     try {
-      const { data, type } = await fileForReading(file);
+      const picked = await prepareFile(file);
+      setKept(picked);
+      const { data, type } = picked;
       const names = (cats ?? []).map((c) => ({ id: c.id, name: c.parent_id ? `${(cats ?? []).find((p) => p.id === c.parent_id)?.name ?? ""} › ${c.name}` : c.name }));
       const r = (await safe(() => readBill(data, type, { categories: names, vendors: (vendors ?? []).map((v) => ({ id: v.id, name: v.name })), today: todayIST() }))) as BillStep;
       if (!r.ok || !r.bill) return setBill({ ok: false, text: r.message ?? "Couldn't read the bill.", needsKey: r.needsKey });
@@ -375,12 +416,14 @@ function ExpenseForm({ me }: { me: Profile }) {
             vendor_id: vendorId || undefined,
             spent_on: v("spent_on"),
             note: v("note"),
+            bill: kept ? { blob: kept.blob, name: kept.name } : null,
           });
           setBusy(false);
           setMsg(r);
           if (r.ok) {
             formRef.current?.reset();
             setNewVendor("");
+            setKept(null);
             setBill({});
             setVendorId("");
             setCategoryId("");
@@ -389,10 +432,10 @@ function ExpenseForm({ me }: { me: Profile }) {
       >
         <div className="bill-read">
           <label className={`btn ghost small${bill.busy ? " disabled" : ""}`}>
-            {bill.busy ? "Reading the bill…" : "Read from a bill (photo or PDF)"}
+            {bill.busy ? "Reading the bill…" : kept ? "Choose a different bill" : "Attach a bill and fill in from it"}
             <input
               type="file"
-              accept="image/*,application/pdf"
+              accept="image/*,application/pdf,text/*,.csv,.txt"
               hidden
               disabled={bill.busy}
               onChange={(e) => {
@@ -404,6 +447,14 @@ function ExpenseForm({ me }: { me: Profile }) {
           </label>
           {bill.text && <span className={bill.ok ? "success" : "error"}>{bill.text}</span>}
         </div>
+        {kept && (
+          <p className="hint" style={{ marginTop: -6 }}>
+            Attached: <b>{kept.name}</b> ({kb(kept.blob.size)}). {kept.note} It is saved with the expense.{" "}
+            <button type="button" className="link" onClick={() => setKept(null)}>
+              Remove
+            </button>
+          </p>
+        )}
         {bill.doubts && bill.doubts.length > 0 && (
           <ul className="doubts">
             {bill.doubts.map((d, i) => (

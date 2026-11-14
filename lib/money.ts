@@ -105,7 +105,7 @@ export async function addExpense(
   me: Profile,
   cats: ExpenseCategory[],
   vendors: Vendor[],
-  input: { amount: string; category_id: string; vendor: string; vendor_id?: string; spent_on: string; note: string },
+  input: { amount: string; category_id: string; vendor: string; vendor_id?: string; spent_on: string; note: string; bill?: { blob: Blob; name: string } | null },
 ): Promise<Result> {
   const amount = Number(input.amount.replace(/[₹,\s]/g, ""));
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Enter an amount" };
@@ -128,7 +128,18 @@ export async function addExpense(
     }
   }
 
+  // Keep the bill itself, if one was attached.
+  let bill_path: string | null = null;
+  if (input.bill) {
+    const ext = (input.bill.name.split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "bin";
+    bill_path = `${(input.spent_on || new Date().toISOString()).slice(0, 7)}/${crypto.randomUUID()}.${ext}`;
+    const up = await sb().storage.from("bills").upload(bill_path, input.bill.blob, { contentType: input.bill.blob.type || undefined });
+    if (up.error) return { ok: false, message: `The bill couldn't be saved: ${up.error.message}` };
+  }
+
   const { error } = await sb().from("expenses").insert({
+    bill_path,
+    bill_name: input.bill?.name ?? null,
     amount,
     category_id: input.category_id,
     vendor_id: vendorId,
@@ -158,4 +169,11 @@ export function downloadExpensesCsv(rows: Expense[], cats: ExpenseCategory[] | u
   a.download = `rifahs-expenses-${label}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/** Open the bill kept with an expense (a link that works for one minute). */
+export async function openBill(path: string) {
+  const { data, error } = await sb().storage.from("bills").createSignedUrl(path, 60);
+  if (error || !data?.signedUrl) return alert(`Couldn't open the bill: ${error?.message ?? "not found"}`);
+  window.open(data.signedUrl, "_blank", "noopener");
 }

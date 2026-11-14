@@ -37,11 +37,14 @@ Do not guess a figure you cannot read; raise a doubt instead.`;
 
 export async function readBillWithClaude(data: string, mediaType: string, opts: BillOptions): Promise<BillReading> {
   const client = new Anthropic({ timeout: 22_000, maxRetries: 0 });
+  // Three kinds of file can be read: a picture, a PDF, or plain text (a text or CSV file, sent as its text).
+  if (mediaType !== "application/pdf" && mediaType !== "text/plain" && !IMAGE_TYPES.includes(mediaType as ImageType)) throw new Error("Use a picture, a PDF or a text file.");
   const file: Anthropic.ContentBlockParam =
     mediaType === "application/pdf"
       ? { type: "document", source: { type: "base64", media_type: "application/pdf", data } }
-      : { type: "image", source: { type: "base64", media_type: mediaType as ImageType, data } };
-  if (mediaType !== "application/pdf" && !IMAGE_TYPES.includes(mediaType as ImageType)) throw new Error("Use a photo (JPG, PNG, WebP) or a PDF.");
+      : mediaType === "text/plain"
+        ? { type: "text", text: `The bill, as text:\n\n${data.slice(0, 60_000)}` }
+        : { type: "image", source: { type: "base64", media_type: mediaType as ImageType, data } };
   try {
     const response = await client.messages.parse({
       model: MODEL,
