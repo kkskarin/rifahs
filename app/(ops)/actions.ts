@@ -6,7 +6,7 @@
 import { requireAdmin, requireMember } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { CORE_TAG, cancelAndDeleteCoreOrder, changeLineSize, createShopifyOrder, fulfillOrder, shopifyConfigured, updateOrderDetails } from "@/lib/shopify";
-import { syncBudgetMs, syncRecent, syncStock } from "@/lib/sync";
+import { syncBudgetMs, syncDeliveries, syncRecent, syncStock } from "@/lib/sync";
 import { siteUrl } from "@/lib/site";
 import type { OrderItem, TeamRole } from "@/lib/types";
 
@@ -72,13 +72,17 @@ export async function syncShopifyNow(): Promise<ActionResult> {
   try {
     const r = await syncRecent(syncBudgetMs());
     const stock = await syncStock();
+    const del = await syncDeliveries().catch((e) => ({ checked: 0, delivered: 0, done: true, error: (e as Error).message }));
     // New orders take any matching stock that is On Hand (spec: order received → Committed to Dispatch).
     await supabaseAdmin().rpc("allocate_on_hand").then(() => undefined, () => undefined);
     return {
       ok: true,
       message:
         `Orders: ${r.created} new, ${r.updated} updated${r.done ? "" : " — more to fetch, press again"}. ` +
-        (stock.ok ? `Stock: ${stock.variants} sizes read from Shopify.` : `Stock not read: ${stock.message}`),
+        (stock.ok ? `Stock: ${stock.variants} sizes read from Shopify. ` : `Stock not read: ${stock.message} `) +
+        ("error" in del
+          ? `Delivery status not read: ${String(del.error).slice(0, 160)}`
+          : `Delivery: ${del.checked} dispatched orders checked, ${del.delivered} now Delivered${del.done ? "" : " — more to check, press again"}.`),
     };
   } catch (e) {
     return { ok: false, message: (e as Error).message };

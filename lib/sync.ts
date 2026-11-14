@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase-server";
-import { appAccess, fetchOrder, fetchOrdersPage, fetchStock, type ShopifyOrder } from "./shopify";
+import { appAccess, fetchOrder, fetchOrdersPage, fetchStock, shopifyGraphQL, type ShopifyOrder } from "./shopify";
 import { OPEN_STATUSES, type OrderItem, type OrderStatus } from "./types";
 
 // Sizes as they appear in variant titles, e.g. "M", "XXL", "M / Cotton", "Unstitched", "Free Size".
@@ -311,4 +311,60 @@ export async function syncStock() {
     await db.from("sync_state").upsert({ key: "shopify_stock", value: { ok: false, message }, updated_at: now });
     return { ok: false as const, message };
   }
+}
+
+/**
+ * Delivery status for orders already dispatched. The normal sync only fetches orders that changed in
+ * Shopify since the last run, so orders dispatched earlier are checked here, a batch at a time.
+ */
+export async function syncDeliveries(budgetMs = 4_000) {
+  const db = supabaseAdmin();
+  const started = Date.now();
+  const { data: state } = await db.from("sync_state").select("value").eq("key", "shopify_deliveries").maybeSingle();
+  let offset = Number((state?.value as { offset?: number } | null)?.offset ?? 0);
+  let checked = 0;
+  let delivered = 0;
+  let done = false;
+  while (Date.now() - started < budgetMs) {
+    const { data: rows } = await db
+      .from("orders")
+      .select("id, shopify_id, status, dispatched_at")
+      .eq("status", "dispatched")
+      .not("shopify_id", "is", null)
+      .order("placed_at", { ascending: false })
+      .range(offset, offset + 39);
+    if (!rows?.length) {
+      done = true;
+      break;
+    }
+    const res = await shopifyGraphQL<{ nodes: ({ legacyResourceId: string; fulfillments: { createdAt: string; displayStatus: string | null; deliveredAt: string | null }[] } | null)[] }>(
+      `query($ids: [ID!]!) { nodes(ids: $ids) { ... on Order { legacyResourceId fulfillments(first: 5) { createdAt displayStatus deliveredAt } } } }`,
+      { ids: rows.map((r) => `gid://shopify/Order/${r.shopify_id}`) },
+    );
+    let moved = 0;
+    for (const n of res.nodes) {
+      if (!n) continue;
+      const row = rows.find((r) => String(r.shopify_id) === n.legacyResourceId);
+      if (!row) continue;
+      const f = n.fulfillments ?? [];
+      const patch: Record<string, unknown> = { delivery_status: f.map((x) => x.displayStatus).filter(Boolean).join(", ").toLowerCase().replace(/_/g, " ") || null };
+      if (f.length && f.every((x) => x.displayStatus === "DELIVERED")) {
+        patch.status = "delivered";
+        patch.delivered_at = f.map((x) => x.deliveredAt).filter(Boolean).sort().pop() ?? new Date().toISOString();
+        moved++;
+      }
+      await db.from("orders").update(patch).eq("id", row.id);
+      if (patch.status) await db.from("order_events").insert({ order_id: row.id, kind: "shopify_sync", from_status: "dispatched", to_status: "delivered", message: "Courier marked this delivered (from Shopify)" });
+    }
+    checked += rows.length;
+    delivered += moved;
+    // Orders that became Delivered drop out of the list, so only step past the ones that stayed.
+    offset += rows.length - moved;
+    if (rows.length < 40) {
+      done = true;
+      break;
+    }
+  }
+  await db.from("sync_state").upsert({ key: "shopify_deliveries", value: { offset: done ? 0 : offset }, updated_at: new Date().toISOString() });
+  return { checked, delivered, done };
 }

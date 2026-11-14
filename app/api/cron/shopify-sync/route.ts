@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { shopifyConfigured } from "@/lib/shopify";
-import { syncBudgetMs, syncRecent, syncStock } from "@/lib/sync";
+import { syncBudgetMs, syncDeliveries, syncRecent, syncStock } from "@/lib/sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 26;
@@ -12,5 +12,6 @@ export async function GET(req: NextRequest) {
   if (!shopifyConfigured()) return NextResponse.json({ ok: false, reason: "shopify not configured" });
   const r = await syncRecent(syncBudgetMs());
   const stock = await syncStock();
-  return NextResponse.json({ ok: true, ...r, stock });
+  const deliveries = await syncDeliveries().catch((e) => ({ error: (e as Error).message }));
+  return NextResponse.json({ ok: true, ...r, stock, deliveries });
 }
