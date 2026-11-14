@@ -3,7 +3,7 @@
 import { useState } from "react";
 import SettingsTabs from "@/components/SettingsTabs";
 import { mutate } from "swr";
-import { removeCoreTestOrder, syncShopifyNow } from "../actions";
+import { allocateStep, checkDeliveriesStep, removeCoreTestOrder, syncShopifyNow, type DeliveryStep } from "../actions";
 import { dateTime } from "@/lib/format";
 import { isAdmin } from "@/lib/roles";
 import { safe } from "@/lib/safe";
@@ -77,9 +77,31 @@ export default function SettingsPage() {
           onClick={async () => {
             setBusy(true);
             const r = (await safe(syncShopifyNow)) as { ok: boolean; message?: string };
+            setMsg({ ...r, message: `${r.message ?? ""} Checking delivery status…` });
+            mutate("sync");
+            // Delivery status and stock allotment run as separate short steps, so no single step runs too long.
+            let checked = 0;
+            let delivered = 0;
+            let note = "";
+            for (let i = 0; i < 15; i++) {
+              const d = (await safe(checkDeliveriesStep)) as DeliveryStep;
+              if (!d.ok) {
+                note = ` Delivery status not read: ${d.message ?? "try again"}`;
+                break;
+              }
+              checked += d.checked;
+              delivered += d.delivered;
+              setMsg({ ...r, message: `${r.message ?? ""} Checking delivery status… ${checked} checked` });
+              if (d.done) break;
+            }
+            const a = (await safe(allocateStep)) as { ok: boolean; message?: string };
             setBusy(false);
-            setMsg(r);
+            setMsg({
+              ...r,
+              message: `${r.message ?? ""} Delivery: ${checked} dispatched orders checked, ${delivered} now Delivered.${note}${a.ok && Number(a.message) > 0 ? ` ${a.message} waiting items given On Hand stock.` : ""}`,
+            });
             mutate("orders");
+            mutate("products");
             mutate("sync");
           }}
         >

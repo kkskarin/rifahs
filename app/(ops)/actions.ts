@@ -72,17 +72,11 @@ export async function syncShopifyNow(): Promise<ActionResult> {
   try {
     const r = await syncRecent(syncBudgetMs());
     const stock = await syncStock();
-    const del = await syncDeliveries().catch((e) => ({ checked: 0, delivered: 0, done: true, error: (e as Error).message }));
-    // New orders take any matching stock that is On Hand (spec: order received → Committed to Dispatch).
-    await supabaseAdmin().rpc("allocate_on_hand").then(() => undefined, () => undefined);
     return {
       ok: true,
       message:
         `Orders: ${r.created} new, ${r.updated} updated${r.done ? "" : " — more to fetch, press again"}. ` +
-        (stock.ok ? `Stock: ${stock.variants} sizes read from Shopify. ` : `Stock not read: ${stock.message} `) +
-        ("error" in del
-          ? `Delivery status not read: ${String(del.error).slice(0, 160)}`
-          : `Delivery: ${del.checked} dispatched orders checked, ${del.delivered} now Delivered${del.done ? "" : " — more to check, press again"}.`),
+        (stock.ok ? `Stock: ${stock.variants} sizes read from Shopify.` : `Stock not read: ${stock.message}`),
     };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
@@ -257,4 +251,27 @@ export async function removeCoreTestOrder(orderId: string): Promise<ActionResult
   } catch (e) {
     return { ok: false, message: `${o.order_number}: Shopify refused: ${(e as Error).message.replace(/^Shopify API error: /, "").slice(0, 200)}` };
   }
+}
+
+// ───────────────────────── Delivery status (its own short step, so the sync stays inside the hosting time limit) ─────────────────────────
+
+export type DeliveryStep = { ok: boolean; checked: number; delivered: number; done: boolean; message?: string };
+
+/** One batch of "is it delivered yet?" for orders still Dispatched. The screen calls it until done. */
+export async function checkDeliveriesStep(): Promise<DeliveryStep> {
+  await requireAdmin();
+  if (!shopifyConfigured()) return { ok: false, checked: 0, delivered: 0, done: true, message: "Shopify credentials aren't set yet" };
+  try {
+    const r = await syncDeliveries(5_000);
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, checked: 0, delivered: 0, done: true, message: (e as Error).message.replace(/^Shopify API error: /, "").slice(0, 200) };
+  }
+}
+
+/** New orders take matching stock that is On Hand (spec: order received → Committed to Dispatch). */
+export async function allocateStep(): Promise<ActionResult> {
+  await requireAdmin();
+  const { data, error } = await supabaseAdmin().rpc("allocate_on_hand");
+  return error ? { ok: false, message: error.message } : { ok: true, message: String(data ?? 0) };
 }

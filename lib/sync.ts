@@ -332,7 +332,7 @@ export async function syncDeliveries(budgetMs = 4_000) {
       .eq("status", "dispatched")
       .not("shopify_id", "is", null)
       .order("placed_at", { ascending: false })
-      .range(offset, offset + 39);
+      .range(offset, offset + 24);
     if (!rows?.length) {
       done = true;
       break;
@@ -342,6 +342,8 @@ export async function syncDeliveries(budgetMs = 4_000) {
       { ids: rows.map((r) => `gid://shopify/Order/${r.shopify_id}`) },
     );
     let moved = 0;
+    // Saved together: the database is far from the server, so one at a time would be slow.
+    const writes: PromiseLike<unknown>[] = [];
     for (const n of res.nodes) {
       if (!n) continue;
       const row = rows.find((r) => String(r.shopify_id) === n.legacyResourceId);
@@ -353,14 +355,15 @@ export async function syncDeliveries(budgetMs = 4_000) {
         patch.delivered_at = f.map((x) => x.deliveredAt).filter(Boolean).sort().pop() ?? new Date().toISOString();
         moved++;
       }
-      await db.from("orders").update(patch).eq("id", row.id);
-      if (patch.status) await db.from("order_events").insert({ order_id: row.id, kind: "shopify_sync", from_status: "dispatched", to_status: "delivered", message: "Courier marked this delivered (from Shopify)" });
+      writes.push(db.from("orders").update(patch).eq("id", row.id));
+      if (patch.status) writes.push(db.from("order_events").insert({ order_id: row.id, kind: "shopify_sync", from_status: "dispatched", to_status: "delivered", message: "Courier marked this delivered (from Shopify)" }));
     }
+    await Promise.all(writes);
     checked += rows.length;
     delivered += moved;
     // Orders that became Delivered drop out of the list, so only step past the ones that stayed.
     offset += rows.length - moved;
-    if (rows.length < 40) {
+    if (rows.length < 25) {
       done = true;
       break;
     }

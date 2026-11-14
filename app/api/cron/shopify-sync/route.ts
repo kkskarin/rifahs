@@ -12,6 +12,6 @@ export async function GET(req: NextRequest) {
   if (!shopifyConfigured()) return NextResponse.json({ ok: false, reason: "shopify not configured" });
   const r = await syncRecent(syncBudgetMs());
   const stock = await syncStock();
-  const deliveries = await syncDeliveries().catch((e) => ({ error: (e as Error).message }));
+  const deliveries = await syncDeliveries(3_000).catch((e) => ({ error: (e as Error).message }));
   return NextResponse.json({ ok: true, ...r, stock, deliveries });
 }
