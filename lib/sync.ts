@@ -78,6 +78,8 @@ function isExpress(o: ShopifyOrder) {
 function shopifyStatus(o: ShopifyOrder): OrderStatus | null {
   if (o.cancelledAt) return "cancelled";
   if (o.displayFinancialStatus === "REFUNDED") return "refunded";
+  // The courier (through Shopify) says every parcel has reached the customer.
+  if (o.fulfillments.length && o.fulfillments.every((f) => f.displayStatus === "DELIVERED")) return "delivered";
   if (o.displayFulfillmentStatus === "FULFILLED") return "dispatched";
   return null;
 }
@@ -108,6 +110,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
     ship_address: o.shippingAddress,
     financial_status: o.displayFinancialStatus?.toLowerCase() ?? null,
     shopify_fulfilled: o.displayFulfillmentStatus === "FULFILLED",
+    delivery_status: o.fulfillments.map((f) => f.displayStatus).filter(Boolean).join(", ").toLowerCase().replace(/_/g, " ") || null,
     tags: o.tags,
     placed_at: o.createdAt,
   };
@@ -159,14 +162,17 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
   const patch: Record<string, unknown> = { ...shopifyOwned };
   // An order made in Core without an address has no name in Shopify: keep the name typed in Core.
   if (!cleanName(o.shippingAddress?.name || o.customer?.displayName)) delete patch.customer_name;
-  // Sizes the team changed in Core win over Shopify's: keep them, matched by item title in order.
-  const kept = ((existing.items ?? []) as OrderItem[]).filter((i) => i.size_changed);
+  // Sizes the team changed in Core win over Shopify's, and each item keeps the stock stage Core recorded
+  // for it. Both are matched by item title, in order.
+  const kept = ((existing.items ?? []) as OrderItem[]).filter((i) => i.size_changed || i.stage);
   if (kept.length) {
     patch.items = (shopifyOwned.items as OrderItem[]).map((it) => {
       const k = kept.findIndex((x) => x.title === it.title);
       if (k < 0) return it;
       const [mine] = kept.splice(k, 1);
-      return { ...it, size: mine.size, size_changed: true, original_size: it.size && it.size !== mine.size ? it.size : (mine.original_size ?? null) };
+      const staged = mine.stage ? { ...it, stage: mine.stage } : it;
+      if (!mine.size_changed) return staged;
+      return { ...staged, size: mine.size, size_changed: true, original_size: it.size && it.size !== mine.size ? it.size : (mine.original_size ?? null) };
     });
   }
   // Never un-set express that the team flagged by hand.
@@ -185,13 +191,16 @@ export async function upsertShopifyOrder(o: ShopifyOrder) {
     const allow =
       implied === "dispatched"
         ? openish // don't drag "delivered" back to "dispatched"
-        : implied === "cancelled"
+        : implied === "delivered"
+          ? openish || existing.status === "dispatched"
+          : implied === "cancelled"
           ? existing.status !== "refunded"
           : true; // refunded always wins
     if (allow) {
       patch.status = implied;
       statusChanged = true;
-      if (implied === "dispatched" && !existing.dispatched_at) patch.dispatched_at = firstFulfilledAt ?? new Date().toISOString();
+      if ((implied === "dispatched" || implied === "delivered") && !existing.dispatched_at) patch.dispatched_at = firstFulfilledAt ?? new Date().toISOString();
+      if (implied === "delivered") patch.delivered_at = o.fulfillments.map((f) => f.deliveredAt).filter(Boolean).sort().pop() ?? new Date().toISOString();
     }
   }
 

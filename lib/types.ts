@@ -50,10 +50,11 @@ export type OrderStatus = (typeof STATUSES)[number];
 export const FLOW: OrderStatus[] = ["new", "printing", "stitching", "checking", "ready", "dispatched", "delivered"];
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
-  new: "Open",
-  printing: "Fabric",
-  stitching: "Stitching",
-  checking: "QC & Packing",
+  // Stage names from the inventory spec. The stored keys are unchanged.
+  new: "Order Received",
+  printing: "Committed to Stitch",
+  stitching: "In Stitching",
+  checking: "Committed to Dispatch",
   ready: "Ready to Dispatch",
   dispatched: "Dispatched",
   delivered: "Delivered",
@@ -78,6 +79,8 @@ export type OrderItem = {
   /** Set when the team changed the size here; the Shopify sync then leaves this item's size alone. */
   size_changed?: boolean;
   original_size?: string | null;
+  /** Where this item's set has got to (same keys as the order status). Missing = same as the order. */
+  stage?: OrderStatus;
   /** GST % on this line (manual entries). */
   tax_rate?: number | null;
 };
@@ -118,6 +121,8 @@ export type Order = {
   courier: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
+  delivered_at?: string | null;
+  delivery_status?: string | null;
   dispatched_at: string | null;
   shopify_fulfilled: boolean;
   financial_status: string | null;
@@ -193,7 +198,7 @@ export const EXPENSE_CATEGORIES = [
 export const SOURCES = ["Shopflo", "Razorpay", "Instagram", "WhatsApp", "Exhibition", "Walk-in", "Manual"];
 export const COURIERS = ["Delhivery", "Shiprocket", "DTDC", "Blue Dart", "India Post", "DHL", "FedEx", "Aramex", "Other"];
 
-export type StitchedRow = { size: string; qty: number };
+export type StitchedRow = { size: string; qty: number; in_stitching?: number; incoming?: number; not_sellable?: number };
 export type Product = {
   id: string;
   name: string;
@@ -203,6 +208,9 @@ export type Product = {
   in_stock: number;
   at_stitching: number;
   in_production: number;
+  /** Fabric sets on a stitching order that has not gone to the tailor yet. */
+  committed_stitch?: number;
+  not_sellable?: number;
   low_at: number;
   active: boolean;
   notes: string;
@@ -227,3 +235,13 @@ export const STOCK_LABEL: Record<StockField, string> = {
   in_production: "In production",
   stitched: "Ready stitched",
 };
+
+/** Closed = 7 days after delivery (spec). Worked out from the delivery date, not stored. */
+export const CLOSE_AFTER_DAYS = 7;
+export function isClosed(o: { status: OrderStatus; delivered_at?: string | null; updated_at?: string }) {
+  if (o.status !== "delivered") return false;
+  const at = o.delivered_at ?? o.updated_at;
+  return at ? Date.now() - new Date(at).getTime() > CLOSE_AFTER_DAYS * 86400000 : false;
+}
+/** The stage of one item: its own if recorded, otherwise the order's. */
+export const itemStage = (o: { status: OrderStatus }, it: OrderItem): OrderStatus => (OPEN_STATUSES.includes(o.status) && it.stage && OPEN_STATUSES.includes(it.stage) ? it.stage : o.status);

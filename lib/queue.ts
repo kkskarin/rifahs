@@ -1,18 +1,22 @@
 import { normDesign } from "./inventory";
 import { dueInfo, type DueRules } from "./due";
-import type { Order, Product } from "./types";
+import { itemStage, type Order, type OrderStatus, type Product } from "./types";
 
 export type QueueAction = "ready" | "stitch" | "send-unstitched" | "need-fabric" | "untracked";
 export const ACTION_LABEL: Record<QueueAction, string> = {
-  ready: "Ready piece in stock — no stitching",
-  stitch: "Stitch from fabric in stock",
-  "send-unstitched": "Send unstitched fabric",
-  "need-fabric": "Fabric needed — none left",
+  ready: "Size On Hand — no stitching",
+  stitch: "Stitch from fabric On Hand",
+  "send-unstitched": "Send fabric unstitched",
+  "need-fabric": "Fabric needed — none On Hand",
   untracked: "Design not in inventory",
 };
 
 export type QueueLine = {
   order: Order;
+  /** Position of the item on the order, so a stitching order can point back at it. */
+  itemIndex: number;
+  /** This item's own stage (the order's stage if none is recorded). */
+  stage: OrderStatus;
   title: string;
   size: string;
   action: QueueAction;
@@ -52,7 +56,10 @@ export function buildQueue(orders: Order[], products: Product[], rules: DueRules
   const pieces: { g: QueueGroup; line: Omit<QueueLine, "action"> }[] = [];
   for (const o of orders) {
     const due = dueInfo(o, rules);
-    for (const it of o.items ?? []) {
+    for (const [itemIndex, it] of (o.items ?? []).entries()) {
+      const stage = itemStage(o, it);
+      // Items already committed to dispatch (or further) need nothing from the stitching unit.
+      if (stage === "checking" || stage === "ready") continue;
       const product = byKey.get(normDesign(it.title)) ?? null;
       const key = product?.id ?? "x:" + normDesign(it.title);
       let g = groups.get(key);
@@ -70,7 +77,7 @@ export function buildQueue(orders: Order[], products: Product[], rules: DueRules
         groups.set(key, g);
       }
       const unstitchedTitle = /unstitched/i.test(it.title);
-      for (let i = 0; i < Number(it.quantity || 1); i++) pieces.push({ g, line: { order: o, title: it.title, size: unstitchedTitle ? "Unstitched" : normSize(it.size), due } });
+      for (let i = 0; i < Number(it.quantity || 1); i++) pieces.push({ g, line: { order: o, itemIndex, stage, title: it.title, size: unstitchedTitle ? "Unstitched" : normSize(it.size), due } });
     }
   }
 

@@ -719,3 +719,16 @@ span.status-select { display: inline-block; white-space: nowrap; }
 .role-group .checkbox input { margin-top: 2px; flex: none; }
 /* Inventory for a role that can look but not change */
 .card.inv.no-edit .stepper button, .card.inv.no-edit .advance, .card.inv.no-edit .size-chip button, .card.inv.no-edit select { display: none; }
+
+/* Stitching orders */
+.so-create { display: flex; gap: 10px 12px; align-items: flex-end; flex-wrap: wrap; margin: 10px 0 6px; }
+.so-create .field { flex: 1 1 220px; max-width: 320px; }
+.so-card { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.so-head { display: flex; gap: 6px 10px; align-items: center; flex-wrap: wrap; }
+.so-head .so-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+/* Inventory: stage rows on each design */
+.stage-row { display: flex; gap: 6px 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.stage-row > .meta:first-child { min-width: 92px; }
+.stage-chip { border: 1px solid var(--line-strong); border-radius: 4px; padding: 2px 8px; font-size: 13px; white-space: nowrap; }
+.stage-chip b { font-weight: 600; }
+.stage-chip.zero { opacity: 0.5; }

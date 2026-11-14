@@ -19,7 +19,7 @@ export function useProducts() {
   return useSWR<Product[]>(
     "products",
     async () => {
-      const { data, error } = await sb().from("products").select("*, stitched:stitched_stock(size, qty)").order("name");
+      const { data, error } = await sb().from("products").select("*, stitched:stitched_stock(size, qty, in_stitching, incoming, not_sellable)").order("name");
       if (error) throw error;
       return (data ?? []) as Product[];
     },

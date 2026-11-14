@@ -25,7 +25,7 @@ import {
 export type Result = { ok: boolean; message?: string; id?: string };
 
 const ORDER_COLS =
-  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, shipping_charge, tax_mode, tax_type, amount_paid, payment_terms, payment_due_date, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
+  "id, shopify_id, order_number, customer_name, customer_email, customer_phone, items, items_text, total, currency, source, channel, shopify_source_name, status, is_express, promise_date, is_international, is_internal, is_exchange, shipping_charge, tax_mode, tax_type, amount_paid, payment_terms, payment_due_date, ship_country, ship_city, ship_address, courier, tracking_number, tracking_url, dispatched_at, delivered_at, delivery_status, shopify_fulfilled, financial_status, notes, tags, placed_at, created_at, updated_at";
 
 const swrOpts = { revalidateOnFocus: true, dedupingInterval: 4000, keepPreviousData: true };
 
@@ -229,9 +229,14 @@ export async function setStatus(me: Profile, orders: Order[], to: OrderStatus | 
     // Group by target status → one request per target.
     const groups = new Map<OrderStatus, string[]>();
     for (const c of changes) groups.set(c.target, [...(groups.get(c.target) ?? []), c.o.id]);
+    // Cancelled before dispatch: sets already committed or ready go straight back to On Hand.
+    for (const c of changes) {
+      if ((c.target === "cancelled" || c.target === "refunded") && OPEN_STATUSES.includes(c.o.status)) await sb().rpc("release_order", { p_order: c.o.id });
+    }
     for (const [target, ids] of groups) {
       const patch: Record<string, unknown> = { status: target, updated_by: me.id };
       if (target === "dispatched") patch.dispatched_at = now();
+      if (target === "delivered") patch.delivered_at = now();
       const { error } = await sb().from("orders").update(patch).in("id", ids);
       if (error) throw error;
     }

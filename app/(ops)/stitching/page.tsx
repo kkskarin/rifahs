@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import SalesNav from "@/components/SalesNav";
+import StitchingOrders from "@/components/StitchingOrders";
 import { useDueRules } from "@/lib/due";
 import { shortDate, todayIST } from "@/lib/format";
 import { useProducts } from "@/lib/inventory";
@@ -13,9 +14,9 @@ import { STATUS_LABEL, type OrderStatus } from "@/lib/types";
 const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 const long = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 const STAGES: { key: OrderStatus; label: string }[] = [
-  { key: "new", label: "Open" },
-  { key: "printing", label: "Fabric (waiting for fabric)" },
-  { key: "stitching", label: "Already at stitching" },
+  { key: "new", label: "Order Received" },
+  { key: "printing", label: "Committed to Stitch" },
+  { key: "stitching", label: "In Stitching" },
 ];
 
 export default function StitchingQueuePage() {
@@ -24,7 +25,7 @@ export default function StitchingQueuePage() {
   const rules = useDueRules();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [stages, setStages] = useState<OrderStatus[]>(["new", "printing"]);
+  const [stages, setStages] = useState<OrderStatus[]>(["new"]);
   const [only, setOnly] = useState<QueueAction | "">("");
 
   const picked = useMemo(
@@ -63,8 +64,8 @@ export default function StitchingQueuePage() {
         <div className="panel">
           <h3>Stitching queue</h3>
           <p className="hint" style={{ marginTop: -6 }}>
-            Open orders by item, checked against today&apos;s inventory. The earliest due orders get the stock first: a ready stitched piece of the
-            right size is used before fabric, fabric in stock is stitched next, and anything left over is flagged.
+            Orders received, by item, checked against today&apos;s stock. The earliest due orders get the stock first: a size that is On Hand is
+            used before fabric, fabric On Hand is stitched next, and anything left over is flagged as fabric needed.
           </p>
           <div className="grid filters">
             <label className="field">
@@ -108,6 +109,10 @@ export default function StitchingQueuePage() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="no-print">
+        <StitchingOrders groups={groups} />
       </div>
 
       <div className="sheet">

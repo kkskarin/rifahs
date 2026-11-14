@@ -263,7 +263,7 @@ function OrderTable({ orders }: { orders: Order[] }) {
                       </td>
                     )}
                     <td className="stack-actions">
-                      {me && next && next !== "dispatched" && (
+                      {me && next && next !== "dispatched" && o.status === "checking" && (
                         <button className="link" onClick={() => setStatus(me, [o], "next")}>
                           → {STATUS_LABEL[next]}
                         </button>

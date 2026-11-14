@@ -72,6 +72,8 @@ export async function syncShopifyNow(): Promise<ActionResult> {
   try {
     const r = await syncRecent(syncBudgetMs());
     const stock = await syncStock();
+    // New orders take any matching stock that is On Hand (spec: order received → Committed to Dispatch).
+    await supabaseAdmin().rpc("allocate_on_hand").then(() => undefined, () => undefined);
     return {
       ok: true,
       message:

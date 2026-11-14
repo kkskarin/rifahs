@@ -167,7 +167,13 @@ const OrderCard = memo(function OrderCard({
       )}
       {!selecting && me && (
         <div className="actions">
-          {next && next !== "dispatched" && (
+          {/* Stitching stages move through stitching orders; only packing is marked by hand. */}
+          {(o.status === "new" || o.status === "printing" || o.status === "stitching") && (
+            <Link href="/stitching" className="link">
+              Stitching queue
+            </Link>
+          )}
+          {next && next !== "dispatched" && o.status === "checking" && (
             <button
               className="advance"
               onClick={async () => {

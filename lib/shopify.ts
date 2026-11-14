@@ -108,7 +108,7 @@ export const ORDER_FIELDS = /* GraphQL */ `
       originalUnitPriceSet { shopMoney { amount } }
     }
   }
-  fulfillments(first: 5) { createdAt trackingInfo { company number url } }
+  fulfillments(first: 5) { createdAt displayStatus deliveredAt trackingInfo { company number url } }
 `;
 
 export type ShopifyOrder = {
@@ -152,7 +152,7 @@ export type ShopifyOrder = {
       originalUnitPriceSet: { shopMoney: { amount: string } };
     }[];
   };
-  fulfillments: { createdAt: string; trackingInfo: { company: string | null; number: string | null; url: string | null }[] }[];
+  fulfillments: { createdAt: string; displayStatus?: string | null; deliveredAt?: string | null; trackingInfo: { company: string | null; number: string | null; url: string | null }[] }[];
 };
 
 export async function fetchOrder(legacyId: string | number) {

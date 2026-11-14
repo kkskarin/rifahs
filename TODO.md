@@ -22,3 +22,14 @@
    - Build first as a "what Core would set vs what Shopify shows" list for the owner to check, then
      switch on real updates. This reverses the earlier "Core never changes Shopify stock" rule, so
      update CLAUDE.md when permission is given.
+
+8. **Inventory spec (14 Nov 2026: Fabric Sets & Size Variants)** — being built in stages on preview.
+   - Stage 1 (done on preview): stock by stage, stitching orders (commit → sent to tailor → received),
+     per-item order stages with spec names, On Hand stock auto-committed to received orders, Closed =
+     7 days after delivery, Delivered read from Shopify's delivery status.
+   - Stage 2 (not built): purchase orders + goods receipt notes under Purchase (sub-tabs Purchase
+     orders / Expenses); opening PO per design for fabric on the way. Open: does receiving a PO create an
+     expense entry? (suggested: keep separate).
+   - Stage 3 (not built): returns → inspection → On Hand / Not Sellable; MSQ alerts with suggested
+     order quantity; Sellable switch.
+   - Orders ship as one parcel; each item has its own stage and the order shows its slowest item.

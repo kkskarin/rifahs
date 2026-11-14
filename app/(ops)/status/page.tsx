@@ -7,23 +7,25 @@ import { dueInfo, useDueRules } from "@/lib/due";
 import { itemsLine, shortDate } from "@/lib/format";
 import { matches } from "@/lib/search";
 import { useIssues, useOrders } from "@/lib/store";
-import { OPEN_STATUSES, STATUS_LABEL, type Order, type OrderStatus } from "@/lib/types";
+import { OPEN_STATUSES, STATUS_LABEL, isClosed, type Order, type OrderStatus } from "@/lib/types";
 
 // The eight views asked for, plus Dispatched (in transit) which sits between Ready and Delivered.
-type Bucket = "new" | "printing" | "stitching" | "checking" | "ready" | "dispatched" | "delivered" | "issue" | "closed";
+type Bucket = "new" | "printing" | "stitching" | "checking" | "ready" | "dispatched" | "delivered" | "issue" | "closed" | "void";
 const BUCKETS: { key: Bucket; label: string }[] = [
-  { key: "new", label: "Open" },
-  { key: "printing", label: "Fabric" },
-  { key: "stitching", label: "Stitching" },
-  { key: "checking", label: "QC & Packing" },
+  { key: "new", label: "Order Received" },
+  { key: "printing", label: "Committed to Stitch" },
+  { key: "stitching", label: "In Stitching" },
+  { key: "checking", label: "Committed to Dispatch" },
   { key: "ready", label: "Ready to Dispatch" },
   { key: "dispatched", label: "Dispatched" },
   { key: "delivered", label: "Delivered" },
   { key: "issue", label: "Issue" },
   { key: "closed", label: "Closed" },
+  { key: "void", label: "Cancelled / refunded" },
 ];
 const CHOICES: OrderStatus[] = ["new", "printing", "stitching", "checking", "ready", "dispatched", "delivered", "cancelled", "refunded"];
-const bucketOf = (o: Order): Bucket => (o.status === "cancelled" || o.status === "refunded" ? "closed" : (o.status as Bucket));
+// Closed = 7 days after delivery. Cancelled and refunded orders have their own group.
+const bucketOf = (o: Order): Bucket => (o.status === "cancelled" || o.status === "refunded" ? "void" : isClosed(o) ? "closed" : (o.status as Bucket));
 
 export default function OrderStatusPage() {
   const { data: orders } = useOrders();
@@ -129,7 +131,7 @@ export default function OrderStatusPage() {
                       <td data-label="Courier · AWB">{[o.courier, o.tracking_number].filter(Boolean).join(" · ")}</td>
                       <td data-label="Status">
                         <span className="status-cell">
-                          <span className={`status-select st-${b}`}>{STATUS_LABEL[o.status]}</span>
+                          <span className={`status-select st-${b === "void" ? "closed" : b}`}>{b === "closed" ? "Closed" : STATUS_LABEL[o.status]}</span>
                           {withIssue.has(o.id) && (
                             <Link href="/disputes" className="issue-tag">
                               Issue

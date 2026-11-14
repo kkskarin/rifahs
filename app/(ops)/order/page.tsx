@@ -14,7 +14,7 @@ import { DispatchForm } from "@/components/OrderList";
 import { dateTime, itemsLine, money } from "@/lib/format";
 import { isAdmin } from "@/lib/roles";
 import { addNote, changeItemSize, deleteOrder, useIssues, useMe, useOrderEvents, useOrders, useTeam } from "@/lib/store";
-import { OPEN_STATUSES, SIZE_OPTIONS, STATUS_LABEL } from "@/lib/types";
+import { OPEN_STATUSES, SIZE_OPTIONS, STATUS_LABEL, itemStage } from "@/lib/types";
 
 const SHOP_ADMIN = "https://admin.shopify.com/store/xd1uww-uu";
 
@@ -155,6 +155,7 @@ export default function OrderPage() {
                 {it.title}
                 {it.quantity > 1 ? ` ×${it.quantity}` : ""}
               </span>
+              {OPEN_STATUSES.includes(o.status) && <span className={`pill ${itemStage(o, it)}`}>{STATUS_LABEL[itemStage(o, it)]}</span>}
               {it.size_changed && <span className="meta">was {it.original_size ?? "—"}</span>}
               <span className="master-actions">
                 <label className="sr-only" htmlFor={`size-${i}`}>

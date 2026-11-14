@@ -87,23 +87,23 @@ export default function InventoryPage() {
     <>
       <div className="page-head">
         <h1>Inventory</h1>
-        <p>Each piece is in one place: waiting for fabric, unstitched stock, at stitching, or ready for dispatch — set against the orders not yet sent for stitching.</p>
+        <p>Counted in sets. A fabric set is Incoming, On Hand or Committed to Stitch; once with the tailor it is In Stitching under its size, then On Hand as that size.</p>
       </div>
       <div className="inv-totals">
         <div>
-          <span>Waiting for fabric</span>
+          <span>Fabric incoming</span>
           <b>{totals.production}</b>
         </div>
         <div>
-          <span>Unstitched stock</span>
+          <span>Fabric On Hand</span>
           <b>{totals.stock}</b>
         </div>
         <div>
-          <span>At stitching</span>
+          <span>In Stitching</span>
           <b>{totals.stitching}</b>
         </div>
         <div>
-          <span>Ready for dispatch</span>
+          <span>Sizes On Hand</span>
           <b>{totals.ready}</b>
         </div>
         <div>
@@ -212,6 +212,7 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
     const r = await adjust(p, changes, reason);
     setErr(r.ok ? null : r.message);
   };
+  const inStitch = p.stitched.filter((r) => (r.in_stitching ?? 0) > 0);
   const stitched = p.stitched.filter((r) => r.qty > 0).sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size));
 
   return (
@@ -234,20 +235,25 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
 
       <div className="inv-grid">
         <div className="counter" title="Ordered pieces not yet sent for stitching">
-          <span>1 · Uncommitted orders</span>
+          <span>Orders received</span>
           <b>{d?.waitingQty ?? 0}</b>
           {d && d.inWorkQty > 0 && <small>+{d.inWorkQty} already in work</small>}
         </div>
-        <Counter label="2 · Waiting for fabric" value={p.in_production} onChange={(n) => run([{ field: "in_production", delta: n }], "Adjusted")} />
-        <Counter label="3 · Unstitched stock" value={p.in_stock} onChange={(n) => run([{ field: "in_stock", delta: n }], "Adjusted")} />
-        <Counter label="4 · At stitching" value={p.at_stitching} onChange={(n) => run([{ field: "at_stitching", delta: n }], "Adjusted")} />
+        <Counter label="Fabric · Incoming from Vendor" value={p.in_production} onChange={(n) => run([{ field: "in_production", delta: n }], "Adjusted")} />
+        <Counter label="Fabric · On Hand" value={p.in_stock} onChange={(n) => run([{ field: "in_stock", delta: n }], "Adjusted")} />
+        <div className="counter" title="Fabric sets on a stitching order that has not gone to the tailor yet">
+          <span>Fabric · Committed to Stitch</span>
+          <b>{p.committed_stitch ?? 0}</b>
+          <small>from stitching orders</small>
+        </div>
+        <Counter label="In Stitching (all sizes)" value={p.at_stitching} onChange={(n) => run([{ field: "at_stitching", delta: n }], "Adjusted")} />
         <div className="counter" title="Stitched pieces with us, by size (listed below)">
-          <span>5 · Ready for dispatch</span>
+          <span>Sizes · On Hand</span>
           <b>{stitched.reduce((a, r) => a + r.qty, 0)}</b>
           <small>by size below</small>
         </div>
         <div className="counter" title="Uncommitted orders beyond the unstitched stock we hold">
-          <span>6 · Short by</span>
+          <span>Short by</span>
           <b className={short > 0 ? "danger" : ""}>{short}</b>
           {short > 0 && <small>{p.in_production >= short ? "covered when fabric arrives" : `${short - p.in_production} not on order yet`}</small>}
         </div>
@@ -260,8 +266,9 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
           onClick={() => run([{ field: "in_production", delta: -1 }, { field: "in_stock", delta: 1 }], "Fabric arrived")}
           title="Move 1 from waiting for fabric to unstitched stock"
         >
-          Fabric received
+          Fabric received from vendor
         </button>
+        {/* Fabric now goes to the tailor through a stitching order (Sales → Stitching queue).
         <button
           className="advance"
           disabled={p.in_stock < 1}
@@ -270,6 +277,7 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
         >
           → Stitching
         </button>
+        */}
         <button className="link" onClick={() => setOpen((o) => !o)}>
           {open ? "Hide" : "Details"}
         </button>
@@ -298,8 +306,21 @@ function ProductCard({ p, d, short, low, shop, over, hasShopify }: { p: Product;
           )}
         </div>
       )}
+      {inStitch.length > 0 && (
+        <div className="stage-row">
+          <span className="meta">In Stitching:</span>
+          {inStitch.map((r) => (
+            <span key={r.size} className="stage-chip">
+              {r.size} <b>{r.in_stitching}</b>
+            </span>
+          ))}
+          {p.at_stitching - inStitch.reduce((a, r) => a + (r.in_stitching ?? 0), 0) > 0 && (
+            <span className="meta">+ {p.at_stitching - inStitch.reduce((a, r) => a + (r.in_stitching ?? 0), 0)} from before, size not recorded</span>
+          )}
+        </div>
+      )}
       <div className="row2" style={{ marginTop: 10 }}>
-        <span className="meta">Ready for dispatch:</span>
+        <span className="meta">Sizes On Hand:</span>
         {stitched.length ? (
           stitched.map((r) => (
             <span key={r.size} className="size-chip">
