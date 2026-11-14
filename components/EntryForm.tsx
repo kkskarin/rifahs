@@ -207,7 +207,16 @@ export default function EntryForm({ order }: { order?: Order }) {
           await mutate("orders");
           if (!s.ok) {
             setBusy(false);
-            return setMsg({ ok: false, id: r.id, text: s.message ?? "Shopify refused the order" });
+            const text = s.message ?? "Shopify refused the order";
+            // A new entry is already saved at this point. Go to it, so pressing Save again can't create a second one;
+            // the order page shows what went wrong and has the "Create in Shopify" button.
+            if (!order) {
+              try {
+                sessionStorage.setItem(`shopify-msg:${r.id}`, text);
+              } catch {}
+              return router.replace(`/order?id=${r.id}`);
+            }
+            return setMsg({ ok: false, id: r.id, text });
           }
         }
         setBusy(false);

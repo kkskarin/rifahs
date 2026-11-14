@@ -4,7 +4,7 @@ import { useCan } from "@/lib/perms";
 import SalesNav from "@/components/SalesNav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { mutate } from "swr";
 import { fulfilInShopify, pushOrderToShopify, pushSizeToShopify } from "../actions";
 import { safe } from "@/lib/safe";
@@ -30,6 +30,17 @@ export default function OrderPage() {
   const { data: people } = useTeam(true);
   const [note, setNote] = useState("");
   const [push, setPush] = useState<{ busy?: boolean; ok?: boolean; message?: string }>({});
+  // Arriving straight from "Add entry" when the Shopify step failed: say so here, once.
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const m = sessionStorage.getItem(`shopify-msg:${id}`);
+      if (m) {
+        sessionStorage.removeItem(`shopify-msg:${id}`);
+        setPush({ ok: false, message: `The entry is saved in Core, but it was not created in Shopify: ${m} Press “Create in Shopify” to try again.` });
+      }
+    } catch {}
+  }, [id]);
   const [sizeMsg, setSizeMsg] = useState<{ ok?: boolean; message?: string }>({});
   const [ful, setFul] = useState<{ busy?: boolean; ok?: boolean; message?: string; notify?: boolean }>({});
 

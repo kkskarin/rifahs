@@ -242,13 +242,28 @@ function taxLinesFor(it: NewShopifyOrder["items"][number], mode: string, type: s
   return { taxLines: type === "cgst_sgst" ? [line("CGST", rate / 2, tax / 2), line("SGST", rate / 2, tax / 2)] : [line("IGST", rate, tax)] };
 }
 
+// Whether the app may create or attach customers. Asked once and remembered, so an order isn't first
+// sent with a customer, refused, and sent again.
+let customerWrite: { at: number; ok: boolean } | null = null;
+async function canWriteCustomers() {
+  if (customerWrite && Date.now() - customerWrite.at < 10 * 60_000) return customerWrite.ok;
+  try {
+    customerWrite = { at: Date.now(), ok: (await appAccess()).scopes.includes("write_customers") };
+  } catch {
+    customerWrite = { at: Date.now(), ok: false };
+  }
+  return customerWrite.ok;
+}
+
 export async function createShopifyOrder(o: NewShopifyOrder) {
   const [first, ...rest] = o.name.trim().split(/\s+/);
   const last = rest.join(" ") || first;
   const lineItems = [];
   let matched = 0;
-  for (const it of o.items) {
-    const variantId = await findVariant(it.title, it.size);
+  // Look every item up at once: one at a time made a three-item order slow enough to hit the hosting time limit.
+  const variantIds = await Promise.all(o.items.map((it) => findVariant(it.title, it.size)));
+  for (const [i, it] of o.items.entries()) {
+    const variantId = variantIds[i];
     if (variantId) matched++;
     lineItems.push({
       ...(variantId ? { variantId } : { title: it.title, ...(it.size ? { variantTitle: it.size } : {}) }),
@@ -265,7 +280,8 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
   const stateCode = IN_STATES[(a?.province ?? "").trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
   const received = Math.max(o.paid ? (o.total ?? o.paidAmount ?? 0) : (o.paidAmount ?? 0), 0);
   // Attach the customer (found by email or phone, or created), so the order is not left with "No customer".
-  const customer = o.email || o.phone ? { toUpsert: { firstName: first, lastName: last, ...(o.email ? { email: o.email } : {}), ...(o.phone ? { phone: o.phone } : {}) } } : null;
+  const mayWriteCustomers = await canWriteCustomers();
+  const customer = mayWriteCustomers && (o.email || o.phone) ? { toUpsert: { firstName: first, lastName: last, ...(o.email ? { email: o.email } : {}), ...(o.phone ? { phone: o.phone } : {}) } } : null;
   const order: Record<string, unknown> = {
     currency: "INR",
     lineItems,
@@ -324,6 +340,7 @@ export async function createShopifyOrder(o: NewShopifyOrder) {
   }
   const errs = data.orderCreate.userErrors;
   if (errs.length || !data.orderCreate.order) throw new Error(errs.map((e) => e.message).join("; ") || "Shopify did not create the order");
+  if (!mayWriteCustomers && (o.email || o.phone)) customerNote = "the Rifah's Ops app has no permission to write customers yet";
   return { id: Number(data.orderCreate.order.legacyResourceId), name: data.orderCreate.order.name, matched, total: o.items.length, customerNote };
 }
 
