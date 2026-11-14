@@ -786,3 +786,10 @@ th[aria-sort] .th-sort { color: var(--accent); }
 .bill-read { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .bill-read .btn { cursor: pointer; }
 .bill-read .btn.disabled { opacity: 0.6; cursor: progress; }
+
+/* Customer block on the order form: three equal fields, the address, then country to state in one row. */
+.cust-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+.cust-grid > .c2 { grid-column: span 2; } .cust-grid > .c3 { grid-column: span 3; }
+.cust-grid > .c4 { grid-column: span 4; } .cust-grid > .c12 { grid-column: span 12; }
+@media (max-width: 1000px) { .cust-grid > .c2, .cust-grid > .c3, .cust-grid > .c4 { grid-column: span 6; } }
+@media (max-width: 560px) { .cust-grid > .c2, .cust-grid > .c3, .cust-grid > .c4 { grid-column: span 12; } }

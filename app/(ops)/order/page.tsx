@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { mutate } from "swr";
-import { fulfilInShopify, pushOrderToShopify, pushSizeToShopify } from "../actions";
+import { fulfilInShopify, pushOrderToShopify, pushSizeToShopify, removeCoreTestOrder } from "../actions";
 import { safe } from "@/lib/safe";
 import EntryForm from "@/components/EntryForm";
 import OrderForm from "@/components/OrderForm";
@@ -30,6 +30,7 @@ export default function OrderPage() {
   const { data: people } = useTeam(true);
   const [note, setNote] = useState("");
   const [push, setPush] = useState<{ busy?: boolean; ok?: boolean; message?: string }>({});
+  const [del, setDel] = useState<{ busy?: boolean; message?: string }>({});
   // Arriving straight from "Add entry" when the Shopify step failed: say so here, once.
   useEffect(() => {
     if (!id) return;
@@ -263,15 +264,33 @@ export default function OrderPage() {
 
       {me && isAdmin(me) && (
         <div style={{ textAlign: "right" }}>
+          {del.message && <p className="error" style={{ textAlign: "left" }}>{del.message}</p>}
           <button
             className="btn small danger"
+            disabled={del.busy}
             onClick={async () => {
-              if (!confirm("Delete this entry from the order book? This doesn't touch Shopify.")) return;
+              // A test order that Core itself created in Shopify is removed there too (cancelled, then deleted).
+              const coreMade = Boolean(o.shopify_id) && ((o.tags ?? []).includes("Kaleidoscope Core") || o.shopify_source_name === "kaleidoscope_core");
+              const isTest = o.is_internal || (o.tags ?? []).includes("Test");
+              if (coreMade && isTest) {
+                if (!confirm(`Delete this test order here AND in Shopify (${o.order_number})? It is cancelled in Shopify with no refund and no email, then deleted. This cannot be undone.`)) return;
+                setDel({ busy: true });
+                const r = (await safe(() => removeCoreTestOrder(o.id))) as { ok: boolean; message?: string };
+                await mutate("orders");
+                if (!r.ok) return setDel({ message: r.message ?? "Couldn't remove it from Shopify." });
+                return router.replace("/orders");
+              }
+              const note = o.shopify_id
+                ? coreMade
+                  ? ` It stays in Shopify as ${o.order_number}, because it isn't marked Internal / test. To remove it there too, tick Internal / test, save, and delete again.`
+                  : ` It stays in Shopify as ${o.order_number}, and the next sync will bring it back.`
+                : "";
+              if (!confirm(`Delete this entry from the order book?${note}`)) return;
               await deleteOrder(o.id);
               router.replace("/orders");
             }}
           >
-            Delete entry
+            {del.busy ? "Deleting…" : "Delete entry"}
           </button>
         </div>
       )}

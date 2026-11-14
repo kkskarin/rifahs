@@ -38,6 +38,17 @@ export default function OrdersPage() {
   const rules = useDueRules();
   const [view, setViewState] = useState<View>(DEFAULT_VIEW);
   const [showRules, setShowRules] = useState(false);
+  // "Entry added …" after coming back from Add entry, shown once.
+  const [flash, setFlash] = useState("");
+  useEffect(() => {
+    try {
+      const m = sessionStorage.getItem("orders-flash");
+      if (m) {
+        sessionStorage.removeItem("orders-flash");
+        setFlash(m);
+      }
+    } catch {}
+  }, []);
 
   // Remember each person's view on their own device.
   useEffect(() => {
@@ -91,6 +102,7 @@ export default function OrdersPage() {
   return (
     <>
       <SalesNav />
+      {flash && <p className="success" style={{ marginTop: 0 }}>{flash}</p>}
       <div className="toolbar">
         <SearchBox />
         {can("see_amounts") && can("see_contact") && (

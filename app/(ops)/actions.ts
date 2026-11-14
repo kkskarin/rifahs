@@ -242,7 +242,6 @@ export async function removeCoreTestOrder(orderId: string): Promise<ActionResult
     await db.from("orders").delete().eq("id", orderId);
     return { ok: true, message: "Removed from Core." };
   }
-  if (!(o.tags ?? []).includes(CORE_TAG)) return { ok: false, message: `${o.order_number} was not created from Core, so it is left alone.` };
   if (!shopifyConfigured()) return { ok: false, message: "Shopify isn't connected." };
   try {
     const r = await cancelAndDeleteCoreOrder(o.shopify_id);

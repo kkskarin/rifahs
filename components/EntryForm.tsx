@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { mutate } from "swr";
 import { lookupPin, pushOrderToShopify } from "@/app/(ops)/actions";
 import { COUNTRIES, IN_STATE_NAMES, matchState } from "@/lib/places";
@@ -55,7 +55,9 @@ export default function EntryForm({ order }: { order?: Order }) {
   const [find, setFind] = useState("");
   const [picked, setPicked] = useState("");
   const matches = useMemo(() => {
-    const n = find.trim().toLowerCase();
+    // What to search for: the "Existing customer?" box, or else the name being typed below it.
+    const typedName = !picked && !order && custName.trim().length >= 3 ? custName : "";
+    const n = (find.trim() || typedName.trim()).toLowerCase();
     if (n.length < 2) return [];
     const digits = n.replace(/\D/g, "");
     const by = new Map((profiles ?? []).map((p) => [p.key, p]));
@@ -67,7 +69,19 @@ export default function EntryForm({ order }: { order?: Order }) {
       })
       .sort((a, b) => b.c.last.localeCompare(a.c.last))
       .slice(0, 6);
-  }, [find, customers, profiles]);
+  }, [find, customers, profiles, custName, picked, order]);
+  // Typing a complete phone number that already belongs to a customer.
+  const phoneOwner = useMemo(() => {
+    const d = phone.replace(/\D/g, "").slice(-10);
+    if (order || d.length < 10) return null;
+    const c = customers.find((x) => [x.phone, ...x.phones].some((p) => p.replace(/\D/g, "").slice(-10) === d));
+    return c ? { c, p: (profiles ?? []).find((x) => x.key === c.key) } : null;
+  }, [phone, customers, profiles, order]);
+  useEffect(() => {
+    // Fill in by itself only while the rest of the form is still empty, so nothing typed is overwritten.
+    if (phoneOwner && !picked && !custName.trim() && !address1.trim()) fill(phoneOwner.c, phoneOwner.p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneOwner]);
   const fill = (c: Customer, p?: Profile) => {
     setCustName(p?.name || c.name);
     setPhone(p?.phone || c.phone);
@@ -220,7 +234,13 @@ export default function EntryForm({ order }: { order?: Order }) {
           }
         }
         setBusy(false);
-        if (!order) return router.replace(`/order?id=${r.id}`);
+        if (!order) {
+          // Back to the order list, with a line saying what was added.
+          try {
+            sessionStorage.setItem("orders-flash", `Entry added for ${v("customer_name")}${b("to_shopify") ? " and created in Shopify" : ""}.`);
+          } catch {}
+          return router.replace("/orders");
+        }
         setMsg({ ok: true, text: b("to_shopify") ? "Saved, and created in Shopify." : "Saved" });
       }}
     >
@@ -230,7 +250,7 @@ export default function EntryForm({ order }: { order?: Order }) {
       {!order && (
         <div className="cust-find">
           <label className="field">
-            <span>Existing customer?</span>
+            <span>Existing customer? Search here, or just type their phone number or name below</span>
             <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type a name, phone number or address to find them" autoComplete="off" />
           </label>
           {matches.length > 0 && (
@@ -245,27 +265,35 @@ export default function EntryForm({ order }: { order?: Order }) {
             </ul>
           )}
           {find.trim().length >= 2 && !matches.length && <small className="hint">No existing customer matches. Fill in the details below.</small>}
+          {phoneOwner && !picked && (custName.trim() || address1.trim()) && (
+            <small className="hint">
+              This phone number belongs to <b>{phoneOwner.p?.name || phoneOwner.c.name}</b>.{" "}
+              <button type="button" className="link" onClick={() => fill(phoneOwner.c, phoneOwner.p)}>
+                Use their details
+              </button>
+            </small>
+          )}
           {picked && !find && <small className="hint">Filled in from {picked}. Change anything that is different for this order.</small>}
         </div>
       )}
-      <div className="grid">
-        <label className="field">
+      <div className="cust-grid">
+        <label className="field c4">
           <span>Name</span>
           <input name="customer_name" required value={custName} onChange={(e) => setCustName(e.target.value)} />
         </label>
-        <label className="field span2">
+        <label className="field c4">
           <span>Phone</span>
           <PhoneInput name="customer_phone" value={phone} onChange={setPhone} compact country={country} />
         </label>
-        <label className="field">
+        <label className="field c4">
           <span>Email</span>
           <input name="customer_email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
-        <label className="field full">
+        <label className="field c12">
           <span>Address</span>
           <input name="address1" value={address1} onChange={(e) => setAddress1(e.target.value)} placeholder="House, street, area" />
         </label>
-        <label className="field">
+        <label className={`field ${india ? "c2" : "c3"}`}>
           <span>Country</span>
           <select
             value={otherCountry ? "__other" : country || "India"}
@@ -282,22 +310,22 @@ export default function EntryForm({ order }: { order?: Order }) {
           </select>
           {otherCountry && <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Country name" aria-label="Country name" style={{ marginTop: 6 }} />}
         </label>
-        <label className="field">
+        <label className={`field ${india ? "c2" : "c3"}`}>
           <span>{india ? "PIN code" : "Postal code"}</span>
           <input inputMode={india ? "numeric" : "text"} value={pin} onChange={(e) => onPin(e.target.value)} placeholder={india ? "Fills in city and state" : ""} />
           {pinNote && <small className="hint" style={{ margin: 0 }}>{pinNote}</small>}
         </label>
-        <label className="field">
+        <label className="field c3">
           <span>City</span>
           <input value={city} onChange={(e) => setCity(e.target.value)} />
         </label>
         {india && (
-          <label className="field">
+          <label className="field c2">
             <span>District</span>
             <input value={district} onChange={(e) => setDistrict(e.target.value)} />
           </label>
         )}
-        <label className="field">
+        <label className="field c3">
           <span>{india ? "State" : "State / region"}</span>
           {india ? (
             <select value={state} onChange={(e) => setState(e.target.value)}>
